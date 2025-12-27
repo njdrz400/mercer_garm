@@ -38,6 +38,8 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        garm_node,
+        gpio_node,
         delayed_start
     ])
 
