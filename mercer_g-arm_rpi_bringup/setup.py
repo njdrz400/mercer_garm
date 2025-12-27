@@ -1,3 +1,7 @@
+
+import os
+from glob import glob
+
 from setuptools import find_packages, setup
 
 package_name = 'mercer_g-arm_rpi_bringup'
@@ -8,9 +12,12 @@ setup(
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
+         ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
+
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='scott',
