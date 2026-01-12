@@ -1,0 +1,37 @@
+<ros2_control name="GArmTopicSystem" type="system">
+  <hardware>
+    <plugin>mercer_g_arm_topic_hw/TopicSystem</plugin>
+    <param name="command_topic">/joint_commands</param>
+    <param name="feedback_topic">/joint_states_raw</param> 
+  </hardware>
+
+  <joint name="joint1">
+            <command_interface name="position"/>
+            <state_interface name="position">
+              <param name="initial_value">0.0</param>
+            </state_interface>
+            <state_interface name="velocity"/>
+  </joint>
+  <joint name="joint2">
+            <command_interface name="position"/>
+            <state_interface name="position">
+              <param name="initial_value">0.0</param>
+            </state_interface>
+            <state_interface name="velocity"/>
+  </joint>
+  <joint name="joint3">
+            <command_interface name="position"/>
+            <state_interface name="position">
+              <param name="initial_value">0.0</param>
+            </state_interface>
+            <state_interface name="velocity"/>
+  </joint>
+  <joint name="jointPWM">
+            <command_interface name="position"/>
+            <state_interface name="position">
+              <param name="initial_value">0.0</param>
+            </state_interface>
+            <state_interface name="velocity"/>
+  </joint>
+ 
+</ros2_control>
