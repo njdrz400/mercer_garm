@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
-<robot name="g_arm">
+<robot name="g_arm" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+
+  <xacro:include filename="$(find g_arm_description)/urdf/g_arm_ros2_control.xacro"/>
   <!-- Definition of the base link -->
   <link name="base_link">
     <visual>

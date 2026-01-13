@@ -126,6 +126,12 @@ def generate_launch_description():
     )
    
 
+    # Joint state broadcaster spawner (required for MoveIt)
+    joint_state_broadcaster_spawner = ExecuteProcess(
+        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active', 'joint_state_broadcaster', '--controller-manager', '/controller_manager'],
+        output='screen',
+    )
+
     # Arm controller spawner  
 #    /controller_manager/list_controllers
 
@@ -140,15 +146,26 @@ def generate_launch_description():
         output='screen',
     )
 
-  
-
-    # Start arm_controller after ros2_control_node starts
-    start_arm_controller = RegisterEventHandler(
+    # Start joint_state_broadcaster first after ros2_control_node starts
+    start_joint_state_broadcaster = RegisterEventHandler(
         OnProcessStart(
             target_action=ros2_control_node,
             on_start=[
                 TimerAction(
                     period=10.0,
+                    actions=[joint_state_broadcaster_spawner]
+                ),
+            ],
+        )
+    )
+
+    # Start arm_controller after joint_state_broadcaster completes
+    start_arm_controller = RegisterEventHandler(
+        OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[
+                TimerAction(
+                    period=2.0,
                     actions=[arm_controller_spawner]
                 ),
             ],
@@ -180,7 +197,7 @@ def generate_launch_description():
         static_tf_node,
         #gpio_init
         start_ros2_control,
-
+        start_joint_state_broadcaster,
         start_arm_controller,
         start_magnet_controller,
     ])

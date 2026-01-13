@@ -6,9 +6,9 @@
     <xacro:include filename="$(find g_arm_description)/urdf/robot_electromagnet.urdf" />
 
     <!-- Import control_xacro -->
-    <xacro:include filename="g_arm.ros2_control.xacro" />
+    <xacro:include filename="$(find g_arm_moveit2)/config/g_arm.ros2_control.xacro" />
 
-
-    <xacro:g_arm_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
+    <!-- Include ros2_control configuration -->
+    <xacro:g_arm_ros2_control name="GArmTopicSystem" initial_positions_file="$(find g_arm_moveit2)/config/$(arg initial_positions_file)"/>
 
 </robot>
