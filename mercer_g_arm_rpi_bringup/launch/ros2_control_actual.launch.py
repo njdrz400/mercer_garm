@@ -44,12 +44,12 @@ def generate_launch_description():
         ],
     )
 
-    # jspawner = Node(
-    #     package="controller_manager",
-    #     executable="spawner",
-    #     arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
-    #     output="screen",
-    # )
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+        output="screen",
+    )
 
     arm_spawner = Node(
         package="controller_manager",
@@ -62,7 +62,7 @@ def generate_launch_description():
         OnProcessStart(
             target_action=ros2_control_node,
             on_start=[
-                #TimerAction(period=1.0, actions=[jspawner]),
+                TimerAction(period=1.0, actions=[joint_state_broadcaster_spawner]),
                 TimerAction(period=2.0, actions=[arm_spawner]),
             ],
         )
