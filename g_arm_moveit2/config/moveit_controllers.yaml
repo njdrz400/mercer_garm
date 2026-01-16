@@ -9,7 +9,7 @@ moveit_simple_controller_manager:
 
   arm_controller:
     type: FollowJointTrajectory
-    action_ns: arm_controller
+    action_ns: follow_joint_trajectory
     default: true
     joints:
       - joint1
@@ -17,7 +17,7 @@ moveit_simple_controller_manager:
       - joint3
   tool_controller:
     type: FollowJointTrajectory
-    action_ns: tool_controller
+    action_ns: follow_joint_trajectory
     default: false
     joints:
       - jointPWM

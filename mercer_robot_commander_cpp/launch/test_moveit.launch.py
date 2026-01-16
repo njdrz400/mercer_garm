@@ -1,4 +1,6 @@
 from launch import LaunchDescription
+from launch.actions import ExecuteProcess, RegisterEventHandler, TimerAction
+from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from moveit_configs_utils import MoveItConfigsBuilder
 
@@ -17,25 +19,35 @@ def generate_launch_description():
     # Convert MoveIt config to dictionary for the node
     moveit_parameters = moveit_config.to_dict()
 
-    # Robot state publisher (publishes TF and robot description)
-    robot_state_publisher = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        name="robot_state_publisher",
-        output="screen",
-        parameters=[moveit_config.robot_description],
-    )
+    # Planning scene monitor parameters
+    planning_scene_monitor_parameters = {
+        "publish_robot_description": False,
+        "publish_robot_description_semantic": True,
+        "publish_planning_scene": True,
+        "publish_geometry_updates": True,
+        "publish_trasforms_updates": True
+    }
 
+    # Start the move_group node (required for MoveGroupInterface)
+    move_group_node = Node(
+        package="moveit_ros_move_group",
+        executable="move_group",
+        output="screen",
+        parameters=[moveit_parameters, planning_scene_monitor_parameters],
+        arguments=['--ros-args', '--log-level', 'info'],
+    )
+   
     # Create the node with MoveIt parameters
-    test_moveit_node = Node(
+    commander_node = Node(
         package="mercer_robot_commander_cpp",
-        executable="test_moveit",
-        name="test_moveit",
+        executable="commander",
+        name="commander",
         output="screen",
         parameters=[moveit_parameters],
+        arguments=['--ros-args', '--log-level', 'debug']
     )
 
     return LaunchDescription([
-        robot_state_publisher,
-        test_moveit_node,
+        move_group_node,
+        commander_node,
     ])
