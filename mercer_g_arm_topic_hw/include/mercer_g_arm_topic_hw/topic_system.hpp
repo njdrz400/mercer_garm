@@ -44,7 +44,7 @@ private:
 
   // Parameters
   std::string command_topic_{"/joint_commands"};
-  std::string feedback_topic_{"/joint_states_raw"};
+  std::string feedback_topic_{"/joint_states"};
   std::vector<std::string> joint_names_;
 
   // ros2 interfaces

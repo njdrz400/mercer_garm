@@ -8,7 +8,7 @@
                 <!-- By default, set up controllers for simulation. This won't work on real hardware -->
                 <plugin>mercer_g_arm_topic_hw/TopicSystem</plugin>
                 <param name="command_topic">/joint_commands</param>
-                <param name="feedback_topic">/joint_states_raw</param>
+                <param name="feedback_topic">/joint_states</param>
                 <!--plugin>mock_components/GenericSystem</plugin-->
             </hardware>
             <joint name="joint1">
