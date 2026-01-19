@@ -35,11 +35,11 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', 'info'],
     )
    
-    # Create the node with MoveIt parameters
-    commander_node = Node(
+    # Create the joint space demo node
+    joint_space_demo_node = Node(
         package="mercer_robot_commander_cpp",
-        executable="commander",
-        name="commander",
+        executable="joint_space_demo",
+        name="joint_space_demo",
         output="screen",
         parameters=[moveit_parameters],
         arguments=['--ros-args', '--log-level', 'info']
@@ -47,5 +47,5 @@ def generate_launch_description():
 
     return LaunchDescription([
         move_group_node,
-        commander_node,
+        joint_space_demo_node,
     ])

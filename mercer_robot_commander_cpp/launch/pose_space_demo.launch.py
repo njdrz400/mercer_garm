@@ -19,7 +19,7 @@ def generate_launch_description():
 
     # Planning scene monitor parameters
     planning_scene_monitor_parameters = {
-        "publish_robot_description": False,
+        "publish_robot_description": True,
         "publish_robot_description_semantic": True,
         "publish_planning_scene": True,
         "publish_geometry_updates": True,
@@ -35,11 +35,11 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', 'info'],
     )
    
-    # Create the node with MoveIt parameters
-    commander_node = Node(
+    # Create the pose space demo node
+    pose_space_demo_node = Node(
         package="mercer_robot_commander_cpp",
-        executable="commander",
-        name="commander",
+        executable="pose_space_demo",
+        name="pose_space_demo",
         output="screen",
         parameters=[moveit_parameters],
         arguments=['--ros-args', '--log-level', 'info']
@@ -47,5 +47,5 @@ def generate_launch_description():
 
     return LaunchDescription([
         move_group_node,
-        commander_node,
+        pose_space_demo_node,
     ])

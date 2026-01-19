@@ -71,8 +71,11 @@ def generate_launch_description():
         package="robot_state_publisher",
         executable="robot_state_publisher",
         name="robot_state_publisher",
-        output="both",
-        parameters=[moveit_config.robot_description],
+        output="screen",
+        parameters=[moveit_config.robot_description,
+        {'use_sim_time': False,
+        'ignore_timestamp': True}
+        ],
     )
 
 

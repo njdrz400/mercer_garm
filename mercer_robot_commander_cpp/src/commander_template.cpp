@@ -23,7 +23,7 @@ class Commander
 {
 public:
     Commander(std::shared_ptr<rclcpp::Node> node){
-        node_ = node;
+        node_ = node;  // Store the node pointer in the member variable
         arm_ = std::make_shared<MoveGroupInterface>(node_, "arm");
         arm_->setMaxVelocityScalingFactor(1.0);
         arm_->setMaxAccelerationScalingFactor(1.0);
@@ -51,15 +51,15 @@ public:
     void goToJointTarget(const std::vector<double> &joints){
         // Get joint names to verify
         std::vector<std::string> joint_names = arm_->getJointNames();
-        RCLCPP_DEBUG(node_->get_logger(), "MoveGroup has %zu joints: %s", 
+        RCLCPP_INFO(node_->get_logger(), "MoveGroup has %zu joints: %s", 
                     joint_names.size(), 
                     joint_names.empty() ? "none" : joint_names[4].c_str());
         
         // Log the joint values being set
-        RCLCPP_DEBUG(node_->get_logger(), "Setting joint target:");
+        RCLCPP_INFO(node_->get_logger(), "Setting joint target:");
         for (size_t i = 0; i < joints.size(); ++i) {
             std::string joint_name = (i < joint_names.size()) ? joint_names[i] : "unknown";
-            RCLCPP_DEBUG(node_->get_logger(), "  %s[%zu] = %.4f", joint_name.c_str(), i, joints[i]);
+            RCLCPP_INFO(node_->get_logger(), "  %s[%zu] = %.4f", joint_name.c_str(), i, joints[i]);
         }
         
 
@@ -68,12 +68,12 @@ public:
         auto names   = arm_->getJointNames();
         auto current = arm_->getCurrentJointValues();
         
-        RCLCPP_DEBUG(node_->get_logger(), "Getting joint target:");
+        RCLCPP_INFO(node_->get_logger(), "Getting joint target:");
         std::vector<double> target;
         arm_->getJointValueTarget(target);
 
         for (size_t i = 0; i < names.size(); ++i) {
-            RCLCPP_DEBUG(node_->get_logger(), "%s current=%.6f target=%.6f delta=%.6f",
+            RCLCPP_INFO(node_->get_logger(), "%s current=%.6f target=%.6f delta=%.6f",
                       names[i].c_str(), current[i], target[i], target[i] - current[i]);
         }
 
@@ -84,11 +84,11 @@ public:
         bool success = (arm_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
         if (success) {
             const auto & traj = plan.trajectory.joint_trajectory;
-            RCLCPP_DEBUG(node_->get_logger(), "Points: %zu", traj.points.size());
+            RCLCPP_INFO(node_->get_logger(), "Points: %zu", traj.points.size());
             if (!traj.points.empty()) {
               auto & p0 = traj.points.front();
               auto & pN = traj.points.back();
-              RCLCPP_DEBUG(node_->get_logger(), "First pos[0]=%.6f last pos[0]=%.6f", p0.positions[0], pN.positions[0]);
+              RCLCPP_INFO(node_->get_logger(), "First pos[0]=%.6f last pos[0]=%.6f", p0.positions[0], pN.positions[0]);
             }
 
             arm_->execute(plan);
@@ -277,8 +277,8 @@ private:
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
-    // Use default node name - launch file will override with name="commander" if needed
-    // This prevents conflicts when multiple instances are launched
+    // Node name can be overridden by launch file via --ros-args -r __node:=name
+    // The launch file's name parameter automatically adds this remapping
     auto node = std::make_shared<rclcpp::Node>("commander");
     auto commander = Commander(node);
     commander.disableCollisionDetection();
