@@ -122,9 +122,42 @@ ros2 run mercer_robot_commander_cpp example_go_to_pose.py sequence
 - **`create_pose_stamped(frame_id, x, y, z, qx=0.0, qy=0.0, qz=0.0, qw=1.0)`**: 
   Create a PoseStamped message with the specified position and orientation
 
+### Jog GUI (`g_arm_jog_gui.py`)
+
+Interactive GUI for jogging the robot and controlling the electromagnet and LEDs.
+
+**Launch the GUI:**
+```bash
+ros2 launch mercer_robot_commander_cpp g_arm_jog_gui.launch.py
+```
+
+Or run directly:
+```bash
+ros2 run mercer_robot_commander_cpp g_arm_jog_gui.py
+```
+
+**Features:**
+- **XYZ Jogging**: Use +/- buttons to jog the robot in X, Y, or Z directions
+- **Jog Step Size**: Adjustable step size (default: 0.01m) for fine or coarse movements
+- **Electromagnet Control**: Toggle button to turn electromagnet ON/OFF
+- **LED Control**: Toggle buttons for each LED (GPIO pins 17, 18, 27)
+- **Status Display**: Real-time status messages showing current operations
+
+**Requirements:**
+- MoveIt Servo must be running for jogging to work (publishes to `/delta_twist_cmds`)
+- Tool controller or magnet controller must be available for electromagnet control
+- GPIO action server (`/pi_gpio_server`) must be running for LED control
+
+**Usage Tips:**
+- Click and hold the +/- buttons for continuous jogging
+- Press the STOP button or release keys to stop jogging immediately
+- Adjust the jog step size for finer or coarser movements
+- Status messages indicate the current operation and any errors
+
 ## Notes
 
 - The electromagnet is controlled after the arm successfully reaches the target pose
 - If `allow_orientation=True`, orientation constraints are ignored
 - The action server will automatically try both `tool_controller` and `magnet_controller` for electromagnet control
 - Make sure the action server is running: `ros2 launch mercer_robot_commander_cpp go_to_pose_server.launch.py`
+- For jog GUI, ensure MoveIt Servo is running: `ros2 launch g_arm_moveit2 servo.launch.py`

@@ -115,6 +115,7 @@ install(DIRECTORY launch
 install(PROGRAMS
   scripts/go_to_pose_client.py
   scripts/example_go_to_pose.py
+  scripts/g_arm_jog_gui.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

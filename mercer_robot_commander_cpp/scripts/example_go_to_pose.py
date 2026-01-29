@@ -14,8 +14,8 @@ sys.path.insert(0, script_dir)
 from go_to_pose_client import GoToPoseClient, create_pose_stamped
 
 
-def example_basic_movement():
-    """Example: Basic movement to a position"""
+def example_home():
+    """Example: Move to Home position and wait 10 seconds"""
     rclpy.init()
     client = GoToPoseClient()
     
@@ -23,9 +23,18 @@ def example_basic_movement():
         print("Action server not available")
         return
     
-    # Move to position (0.25, 0.0, 0.20) with identity orientation
-    target_pose = create_pose_stamped('base_link', 0.25, 0.0, 0.20)
+    # Home position from SRDF: joint1=0, joint2=0, joint3=0
+    # We need to compute the pose for these joint values
+    # Based on typical robot kinematics, Home is usually around:
+    # x=0.22, y=0.0, z=0.29 (approximate - depends on your robot's link lengths)
+    # For exact pose, you'd need to compute FK, but this is a reasonable approximation
+    # You can also query the current pose after moving to Home using MoveIt
     
+    # Approximate Home pose (you may need to adjust based on your robot)
+    # To get exact: move to Home using MoveIt, then query getCurrentPose()
+    target_pose = create_pose_stamped('base_link', 0.22, 0.0, 0.29, qw=1.0)
+    
+    print("Moving to Home position (approximate pose)...")
     result = client.send_goal(
         target_pose,
         pos_tolerance_m=0.01,
@@ -36,7 +45,20 @@ def example_basic_movement():
     )
     
     if result:
-        client.wait_for_result()
+        result = client.wait_for_result()
+        if result and result.success:
+            print("Successfully moved to Home position")
+            print(f"Final position: x={result.final_pos_error_m:.4f}m error")
+            print("\nWaiting 10 seconds...")
+            import time
+            for i in range(10, 0, -1):
+                print(f"  {i}...", end='', flush=True)
+                time.sleep(1.0)
+            print("\nDone waiting.")
+        else:
+            print("Failed to reach Home position")
+    else:
+        print("Goal rejected")
     
     rclpy.shutdown()
 
@@ -81,18 +103,19 @@ def example_sequence():
     
     # Sequence of positions
     positions = [
-        (0.20, 0.0, 0.29, False),   # Position 1, electromagnet OFF
-        (0.13, -0.17, 0.0025, True),     # Position 2, electromagnet ON
-        (0.13, -0.17, 0.10, True),     # Position 3, electromagnet ON
-        (0.225, 0.0, 0.02, False),  
+        (0.22, 0.0, 0.29, False),   # Position 1, electromagnet OFF
+        (0.175, -0.175, 0.05, False),     # Position 2, electromagnet ON
+        #(0.175, -0.175, 0.10, True),     # Position 3, electromagnet ON
+        #(0.225, 0.0, 0.02, False),  
        # Position 4, electromagnet OFF
-        (0.18, -0.17, 0.02, False),
-        (0.18, -0.17, 0.0025, True),
-        (0.18, -0.17, 0.10, True),
-        (0.275, 0.0, 0.025, False),
+        #(0.225, -0.175, 0.02, False),
+        #(0.225, -0.175, 0.005, True), # Position 4, electromagnet ON
+        #(0.225, -0.175, 0.005, True), # Position 5, electromagnet ON
+        #(0.225, -0.175, 0.10, True),
+        #(0.27, 0.0, 0.025, False),
         
 
-        (0.20, 0.0, 0.29, False), # Position 6, electromagnet OFF
+        #(0.20, 0.0, 0.29, False), # Position 6, electromagnet OFF
              # Position 5, electromagnet ON
     ]
     
@@ -125,14 +148,14 @@ if __name__ == '__main__':
     import sys
     
     if len(sys.argv) > 1:
-        if sys.argv[1] == 'basic':
-            example_basic_movement()
+        if sys.argv[1] == 'home':
+            example_home()
         elif sys.argv[1] == 'magnet':
             example_with_electromagnet()
         elif sys.argv[1] == 'sequence':
             example_sequence()
         else:
-            print("Usage: python3 example_go_to_pose.py [basic|magnet|sequence]")
+            print("Usage: python3 example_go_to_pose.py [home|magnet|sequence]")
     else:
         # Run basic example by default
-        example_basic_movement()
+        example_home()
