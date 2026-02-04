@@ -116,7 +116,13 @@ install(PROGRAMS
   scripts/go_to_pose_client.py
   scripts/example_go_to_pose.py
   scripts/g_arm_jog_gui.py
+  scripts/pose_list_commander_node.py
+  scripts/pose_list_commander_interface.py
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()

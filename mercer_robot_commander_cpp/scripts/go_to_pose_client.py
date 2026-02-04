@@ -124,7 +124,14 @@ class GoToPoseClient(Node):
         else:
             rclpy.spin_until_future_complete(self, self._result_future)
 
-        result = self._result_future.result().result
+        response = self._result_future.result()
+        if response is None:
+            self.get_logger().error('Goal result future returned None (e.g. timeout or aborted)')
+            return None
+        result = getattr(response, 'result', None)
+        if result is None:
+            self.get_logger().error('Goal result is None (e.g. IK failed, action aborted)')
+            return None
 
         if result.success:
             self.get_logger().info('Goal succeeded!')

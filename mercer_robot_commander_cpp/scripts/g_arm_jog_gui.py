@@ -16,6 +16,7 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox
 
 # Try to import GPIO action type, but make it optional for PC deployment
 try:
@@ -401,6 +402,9 @@ class GArmJogGUI(Node):
             self._update_status(f"Moved {axis.upper()}: {'+' if direction > 0 else '-'} {self.step_var.get():.3f}m", "green")
         else:
             self._update_status(f"Jog failed: {result.message}", "red")
+            # Show alert if IK solution not found
+            if result.error_code == 3 or "IK solution" in result.message:
+                self._show_ik_error_alert(result.message)
     
     def _cancel_current_goal(self):
         """Cancel the current action goal"""
@@ -491,6 +495,9 @@ class GArmJogGUI(Node):
             self._update_status("Successfully moved to Home position", "green")
         else:
             self._update_status(f"Home movement failed: {result.message}", "red")
+            # Show alert if IK solution not found
+            if result.error_code == 3 or "IK solution" in result.message:
+                self._show_ik_error_alert(result.message)
     
     def _move_to_position(self):
         """Move robot to the position specified in the text boxes"""
@@ -573,6 +580,21 @@ class GArmJogGUI(Node):
             self._update_status("Successfully moved to target position", "green")
         else:
             self._update_status(f"Move failed: {result.message}", "red")
+            # Show alert if IK solution not found
+            if result.error_code == 3 or "IK solution" in result.message:
+                self._show_ik_error_alert(result.message)
+    
+    def _show_ik_error_alert(self, error_message):
+        """Show an alert dialog when IK solution is not found"""
+        if hasattr(self, 'root'):
+            # Schedule on GUI thread
+            self.root.after(0, lambda: messagebox.showerror(
+                "IK Solution Not Found",
+                f"Inverse Kinematics solution could not be found.\n\n"
+                f"Error: {error_message}\n\n"
+                f"The target pose may be unreachable or outside the robot's workspace.\n"
+                f"Please try a different position."
+            ))
     
     def _validate_number(self, value):
         """Validate that the input is a valid number (including negative)"""

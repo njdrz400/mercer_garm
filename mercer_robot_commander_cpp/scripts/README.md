@@ -154,6 +154,55 @@ ros2 run mercer_robot_commander_cpp g_arm_jog_gui.py
 - Adjust the jog step size for finer or coarser movements
 - Status messages indicate the current operation and any errors
 
+### Pose List Commander (`pose_list_commander_node.py` + `pose_list_commander_interface.py`)
+
+Moves the g-arm through a list of coordinates: **start pose → waypoints → back to start**. An interface lets you start the sequence, monitor which position the robot is on, and notifies when the robot is back at the start.
+
+**Launch (node + GUI):**
+```bash
+# Requires go_to_pose_server and move_group to be running
+ros2 launch mercer_robot_commander_cpp pose_list_commander.launch.py
+```
+
+**Launch without GUI (interface=false):**
+```bash
+ros2 launch mercer_robot_commander_cpp pose_list_commander.launch.py interface:=false
+```
+
+**Waypoints file:** Set via parameter `waypoints_file` (default: package `config/waypoints_example.yaml`). YAML has two parts: **waypoints** (name -> x,y,z coordinates) and **path** (order of waypoints with per-step led_color and electromagnet_on). Example:
+```yaml
+led_color: g   # default (g, y, r)
+
+waypoints:
+  Home:   { x: 0.22, y: 0.0, z: 0.29 }
+  Pick:   { x: 0.3,  y: 0.0, z: 0.02 }
+  X00:    { x: 0.025, y: 0.225, z: 0.01 }
+  Finish: { x: 0.3,  y: 0.0, z: 0.02 }
+
+path:
+  - { wp: Home,   led: y, em_on: false }
+  - { wp: Pick,   led: g,  em_on: false, pause_sec: 0.5 }
+  - { wp: X00,    led: y, em_on: false }
+  - { wp: Finish, led: g,  em_on: false }
+```
+Path: one line per step. Keys: **wp** (waypoint name), **led** (g/y/r), **em_on** (electromagnet on/off), **pause_sec** (optional). Long names (waypoint, led_color, electromagnet_on) and led values (green, yellow, red) also work.
+Path steps reference waypoints by name; each step can set **led**, **em_on**, and **pause_sec**. The same waypoint can appear multiple times in the path with different settings.
+
+**Topics:** The node publishes status for monitoring:
+- `pose_list_commander/state` (std_msgs/String): `idle`, `moving`, `pausing`, `returning`, `back_at_start`, `cancelled`, `error`
+- `pose_list_commander/pause_duration_sec` (std_msgs/Float64): Published when entering a pause (duration in seconds)
+- `pose_list_commander/current_index` (std_msgs/Int32): current position index in the sequence
+- `pose_list_commander/current_waypoint_name` (std_msgs/String): name of the current waypoint (from config)
+- `pose_list_commander/led_color` (std_msgs/String): LED color for current waypoint (g, y, or r), updated as the sequence runs
+- `pose_list_commander/total_count` (std_msgs/Int32): total steps (waypoints + 1 for return)
+- `pose_list_commander/back_at_start` (std_msgs/Bool): `true` when robot has returned to start
+
+**Services:** Start or cancel the sequence:
+- `pose_list_commander/start` (std_srvs/Trigger): start from current pose through waypoints then back to start
+- `pose_list_commander/cancel` (std_srvs/Trigger): cancel the current run
+
+**Interface:** The GUI shows status, progress (e.g. "Position 3 of 5"), the **current waypoint name**, an **LED indicator** (per-waypoint color), and **Pausing (X.Xs)** when the robot is paused between waypoints. A clear **"Robot is back at start position."** is shown when the sequence finishes.
+
 ## Notes
 
 - The electromagnet is controlled after the arm successfully reaches the target pose
