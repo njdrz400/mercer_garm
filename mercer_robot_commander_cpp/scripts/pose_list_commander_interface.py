@@ -24,6 +24,7 @@ class PoseListCommanderInterface(Node):
         self._current_waypoint_name = ''
         self._led_color = 'g'  # g, y, or r from config
         self._pause_duration_sec = 0.0  # current pause duration when pausing
+        self._timeout_sec = None  # goal timeout in seconds (from node; None until received)
 
         self._state_sub = self.create_subscription(
             String, 'pose_list_commander/state', self._on_state, 10
@@ -45,6 +46,9 @@ class PoseListCommanderInterface(Node):
         )
         self._pause_duration_sub = self.create_subscription(
             Float64, 'pose_list_commander/pause_duration_sec', self._on_pause_duration, 10
+        )
+        self._timeout_sec_sub = self.create_subscription(
+            Float64, 'pose_list_commander/timeout_sec', self._on_timeout_sec, 10
         )
         self._start_client = self.create_client(Trigger, 'pose_list_commander/start')
         self._cancel_client = self.create_client(Trigger, 'pose_list_commander/cancel')
@@ -85,6 +89,12 @@ class PoseListCommanderInterface(Node):
     def _on_pause_duration(self, msg):
         self._pause_duration_sec = max(0.0, float(msg.data))
 
+    def _on_timeout_sec(self, msg):
+        try:
+            self._timeout_sec = max(0.0, float(msg.data))
+        except (TypeError, ValueError):
+            self._timeout_sec = None
+
     def _update_gui(self):
         if self._root is None or not self._root.winfo_exists():
             return
@@ -94,6 +104,10 @@ class PoseListCommanderInterface(Node):
             else:
                 self._progress_var.set('—')
             self._waypoint_name_var.set(self._current_waypoint_name or '—')
+            if self._timeout_sec is not None:
+                self._timeout_var.set('%.1f s' % self._timeout_sec)
+            else:
+                self._timeout_var.set('— s')
 
             # Update LED color (g, y, r or green, yellow, red)
             led_hex = {'g': '#00cc00', 'y': '#e6b800', 'r': '#cc0000',
@@ -196,9 +210,13 @@ class PoseListCommanderInterface(Node):
             row=3, column=1, sticky=tk.W, pady=4
         )
 
+        ttk.Label(main, text='Goal timeout:').grid(row=4, column=0, sticky=tk.W, pady=4)
+        self._timeout_var = tk.StringVar(value='— s')
+        ttk.Label(main, textvariable=self._timeout_var).grid(row=4, column=1, sticky=tk.W, pady=4)
+
         # LED indicator (color from config: green, yellow, red)
         led_frame = ttk.Frame(main)
-        led_frame.grid(row=4, column=0, columnspan=2, sticky=tk.W, pady=4)
+        led_frame.grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=4)
         ttk.Label(led_frame, text='LED:').pack(side=tk.LEFT, padx=(0, 6))
         self._led_canvas = tk.Canvas(led_frame, width=24, height=24, highlightthickness=0)
         self._led_canvas.pack(side=tk.LEFT)
@@ -207,7 +225,7 @@ class PoseListCommanderInterface(Node):
         self._led_circle_id = self._led_canvas.create_oval(2, 2, 22, 22, fill=led_hex, outline=led_hex)
 
         ttk.Separator(main, orient=tk.HORIZONTAL).grid(
-            row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=12
+            row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=12
         )
 
         self._back_at_start_var = tk.StringVar(value='')
@@ -215,10 +233,10 @@ class PoseListCommanderInterface(Node):
             main, textvariable=self._back_at_start_var,
             font=tkfont.Font(weight='bold', size=11)
         )
-        self._back_at_start_label.grid(row=6, column=0, columnspan=3, pady=8)
+        self._back_at_start_label.grid(row=7, column=0, columnspan=3, pady=8)
 
         btn_frame = ttk.Frame(main)
-        btn_frame.grid(row=7, column=0, columnspan=3, pady=12)
+        btn_frame.grid(row=8, column=0, columnspan=3, pady=12)
         self._start_btn = ttk.Button(btn_frame, text='Start', command=self._start)
         self._start_btn.pack(side=tk.LEFT, padx=4)
         self._cancel_btn = ttk.Button(btn_frame, text='Cancel', command=self._cancel, state=tk.DISABLED)
@@ -226,7 +244,7 @@ class PoseListCommanderInterface(Node):
 
         ttk.Label(main, text='Start: run waypoints then return to start. Cancel: stop sequence. LED from config.',
                   font=('Arial', 9), foreground='gray').grid(
-            row=8, column=0, columnspan=3, pady=(4, 0)
+            row=9, column=0, columnspan=3, pady=(4, 0)
         )
 
         self._update_gui()

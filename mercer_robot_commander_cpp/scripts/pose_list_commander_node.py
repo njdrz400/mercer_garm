@@ -91,6 +91,7 @@ class PoseListCommanderNode(Node):
         self._led_color_pub = self.create_publisher(String, 'pose_list_commander/led_color', 10)
         self._pause_duration_pub = self.create_publisher(Float64, 'pose_list_commander/pause_duration_sec', 10)
         self._waypoints_list_pub = self.create_publisher(String, 'pose_list_commander/waypoints_list', 10)
+        self._timeout_sec_pub = self.create_publisher(Float64, 'pose_list_commander/timeout_sec', 10)
 
         self._start_srv = self.create_service(Trigger, 'pose_list_commander/start', self._handle_start)
         self._cancel_srv = self.create_service(Trigger, 'pose_list_commander/cancel', self._handle_cancel)
@@ -106,19 +107,21 @@ class PoseListCommanderNode(Node):
 
         self._publish_status(led_color=self._led_color)
         self._publish_waypoints_list()
+        self._publish_timeout_sec()
+        self.create_timer(2.0, self._publish_timeout_sec)  # so late-joining GUI gets it
         self.get_logger().info(
-            'Pose list commander ready with %d waypoints. Frame: %s, LED color: %s' % (
-                len(self._waypoints), self._base_frame, self._led_color)
+            'Pose list commander ready with %d waypoints. Frame: %s, LED: %s, goal timeout: %.1f s' % (
+                len(self._waypoints), self._base_frame, self._led_color, self._get_timeout_sec())
         )
 
     def _turn_off_leds_at_start(self):
-        """Send ROS2 action goals to /pi_gpio_server to turn off LEDs (high=off). Red=22, Green=17."""
+        """Send ROS2 action goals to /pi_gpio_server to turn off LEDs (high=off). Green=17, Yellow=18, Red=27."""
         if self._gpio_action_client is None:
             return
         if not self._gpio_action_client.wait_for_server(timeout_sec=2.0):
             self.get_logger().info('pi_gpio_server (action server) not available; skipping LED turn-off.')
             return
-        for action_spec, label in [('22,high', 'red LED'), ('17,high', 'green LED')]:
+        for action_spec, label in [('17,high', 'green LED'), ('18,high', 'yellow LED'), ('27,high', 'red LED')]:
             try:
                 goal = GPIO.Goal()
                 goal.gpio = action_spec
@@ -133,15 +136,15 @@ class PoseListCommanderNode(Node):
 
     def _set_led_gpio(self, led_color):
         """Set LED by sending ROS2 action goals to /pi_gpio_server (pi_gpio_interface/action/GPIO).
-        No direct GPIO; goal.gpio format e.g. "27,high" or "17,low". Green=17, Yellow=18, Red=22.
+        No direct GPIO; goal.gpio format e.g. "18,low" or "17,high". Green=17, Yellow=18, Red=27.
         Fire-and-forget (send_goal_async) for use from sequence thread."""
         if self._gpio_action_client is None:
             return
         if not self._gpio_action_client.wait_for_server(timeout_sec=0.3):
             return
-        pin_for_color = {'g': 17, 'y': 18, 'r': 22}
+        pin_for_color = {'g': 17, 'y': 27, 'r': 22}
         pin_on = pin_for_color.get(led_color if isinstance(led_color, str) else 'g', 17)
-        all_pins = (17, 18, 22)
+        all_pins = (17, 22, 27)
         try:
             # Turn off all LEDs: send action goals with "pin,high"
             for pin in all_pins:
@@ -166,6 +169,24 @@ class PoseListCommanderNode(Node):
         self._waypoints_list_pub.publish(String(data=msg))
         if msg:
             self.get_logger().info('Waypoint coordinates:\n%s' % msg)
+
+    def _publish_timeout_sec(self):
+        """Publish current goal timeout (so GUI and others can see it)."""
+        self._timeout_sec_pub.publish(Float64(data=float(self._get_timeout_sec())))
+
+    def _get_timeout_sec(self):
+        """Return timeout_sec parameter as float (handles launch passing string)."""
+        p = self.get_parameter('timeout_sec').get_parameter_value()
+        try:
+            v = p.double_value
+            if v > 0:
+                return float(v)
+        except (AttributeError, TypeError):
+            pass
+        try:
+            return float(p.string_value)
+        except (AttributeError, TypeError, ValueError):
+            return 60.0
 
     def _normalize_led(self, raw, default='g'):
         """Normalize led color to g, y, or r. Accepts g/y/r or green/yellow/red."""
@@ -293,6 +314,7 @@ class PoseListCommanderNode(Node):
         self._total_count_pub.publish(Int32(data=self._total_count))
         self._current_waypoint_name_pub.publish(String(data=self._current_waypoint_name))
         self._led_color_pub.publish(String(data=self._led_color))
+        self._timeout_sec_pub.publish(Float64(data=float(self._get_timeout_sec())))
         if back_at_start is not None:
             self._back_at_start_pub.publish(Bool(data=back_at_start))
         # Update physical LEDs via ROS2 action goals (low=on): green=17, yellow=18, red=22
@@ -344,7 +366,7 @@ class PoseListCommanderNode(Node):
     def _run_sequence(self, start_pose):
         pos_tol = self.get_parameter('pos_tolerance_m').get_parameter_value().double_value
         ang_tol = self.get_parameter('ang_tolerance_rad').get_parameter_value().double_value
-        timeout = self.get_parameter('timeout_sec').get_parameter_value().double_value
+        timeout = self._get_timeout_sec()
 
         # Full sequence: start (already there) -> waypoint_1 .. waypoint_N -> start
         total = len(self._waypoints) + 1  # +1 for "back to start"

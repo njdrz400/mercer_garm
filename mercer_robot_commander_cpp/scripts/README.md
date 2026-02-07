@@ -203,6 +203,16 @@ Path steps reference waypoints by name; each step can set **led**, **em_on**, an
 
 **Interface:** The GUI shows status, progress (e.g. "Position 3 of 5"), the **current waypoint name**, an **LED indicator** (per-waypoint color), and **Pausing (X.Xs)** when the robot is paused between waypoints. A clear **"Robot is back at start position."** is shown when the sequence finishes.
 
+## Reducing IK (KDL) failures
+
+The go_to_pose server uses MoveIt’s KDL kinematics plugin for inverse kinematics. If you see “IK solution not found” often:
+
+1. **Position-only** – The server already requests only (x, y, z); orientation is not used for IK.
+2. **Kinematics config** (`g_arm_moveit2/config/kinematics.yaml`): `kinematics_solver_search_resolution` (e.g. 0.001), `kinematics_solver_timeout` (e.g. 60), `kinematics_solver_attempts` (e.g. 150000). Coarser resolution can help KDL find a solution.
+3. **Nudge retries** – The server retries with small position nudges (±2 mm) and extra seeds if the first 100 attempts fail.
+4. **TRAC-IK** – For more robust IK, you can switch to TRAC-IK: install the `trac_ik_kinematics_plugin` package, then in `g_arm_moveit2/config/kinematics.yaml` set `kinematics_solver: trac_ik_kinematics_plugin/TRAC_IKKinematicsPlugin`. TRAC-IK often finds solutions when KDL fails (e.g. near joint limits or singularities).
+5. **Waypoints** – Keep targets inside the arm’s workspace and avoid poses that put the arm in a singularity (e.g. fully extended). The server logs target position and current EE position when IK fails to help debug.
+
 ## Notes
 
 - The electromagnet is controlled after the arm successfully reaches the target pose

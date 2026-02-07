@@ -90,53 +90,61 @@ bool computeIK(
     
     Eigen::Isometry3d target_pose_eigen;
     tf2::fromMsg(pose.pose, target_pose_eigen);
-    
-    // Try IK with multiple attempts to find a solution that matches orientation better
-    // setFromIK can find multiple solutions - we'll try a few times with different seeds
+    // Use only position (x,y,z) for IK; ignore orientation so electromagnet pose is not constrained.
+    // This avoids IK failure due to unreachable orientation and matches kinematics position_only_ik.
+    target_pose_eigen.linear() = Eigen::Matrix3d::Identity();
+
+    // Try IK with many attempts and diverse seeds (KDL is sensitive to seed; timeout is in kinematics.yaml)
+    const int max_attempts = 100;
     bool found_ik = false;
-    int max_attempts = 3;
     for (int attempt = 0; attempt < max_attempts && !found_ik; ++attempt) {
+        if (attempt == 1 && using_current_state) {
+            robot_state.setToDefaultValues();
+            robot_state.update();
+        } else if (attempt > 1) {
+            std::vector<double> seed_state;
+            robot_state.copyJointGroupPositions(joint_model_group, seed_state);
+            double scale = (attempt <= 15) ? 0.05 : 0.2;  // broader spread for later attempts
+            for (auto& val : seed_state) {
+                val += (rand() % 200 - 100) * scale;
+            }
+            robot_state.setJointGroupPositions(joint_model_group, seed_state);
+            robot_state.update();
+        }
         found_ik = robot_state.setFromIK(
             joint_model_group,
             target_pose_eigen,
             end_effector_link
         );
-        
-        // If found, verify orientation is reasonable (not 180 degrees off)
-        if (found_ik) {
-            // Get the pose from this IK solution
-            const Eigen::Isometry3d& ik_pose = robot_state.getGlobalLinkTransform(end_effector_link);
-            Eigen::Quaterniond ik_quat(ik_pose.rotation());
-            Eigen::Quaterniond target_quat(target_pose_eigen.rotation());
-            
-            // Check if quaternions are close (accounting for double cover)
-            double dot = std::abs(ik_quat.dot(target_quat));
-            double angle_error = 2.0 * std::acos(std::min(1.0, dot));
-            
-            // If orientation error is too large (> 90 degrees), try again with different seed
-            if (angle_error > M_PI / 2.0 && attempt < max_attempts - 1) {
-                // Perturb the seed state slightly
-                std::vector<double> seed_state;
-                robot_state.copyJointGroupPositions(joint_model_group, seed_state);
-                for (auto& val : seed_state) {
-                    val += (rand() % 100 - 50) * 0.01; // Small random perturbation
-                }
-                robot_state.setJointGroupPositions(joint_model_group, seed_state);
-                robot_state.update();
-                found_ik = false; // Try again
-            }
-        } else if (attempt < max_attempts - 1) {
-            // If IK failed, try with a slightly different seed
-            std::vector<double> seed_state;
-            robot_state.copyJointGroupPositions(joint_model_group, seed_state);
-            for (auto& val : seed_state) {
-                val += (rand() % 100 - 50) * 0.01;
-            }
-            robot_state.setJointGroupPositions(joint_model_group, seed_state);
+    }
+
+    // If still no solution, retry with tiny position nudges (±2 mm) to escape singularities / numerical edges
+    const double nudge_m = 0.002;
+    if (!found_ik) {
+        double dx[] = {0, 1, -1, 0, 0, 0, 0, 0};
+        double dy[] = {0, 0, 0, 1, -1, 0, 0, 0};
+        double dz[] = {0, 0, 0, 0, 0, 1, -1, 0};
+        for (int n = 0; n < 8 && !found_ik; ++n) {
+            Eigen::Isometry3d nudged = target_pose_eigen;
+            nudged.translation().x() += nudge_m * dx[n];
+            nudged.translation().y() += nudge_m * dy[n];
+            nudged.translation().z() += nudge_m * dz[n];
+            robot_state.setToDefaultValues();
             robot_state.update();
+            for (int k = 0; k < 15 && !found_ik; ++k) {
+                if (k > 0) {
+                    std::vector<double> seed_state;
+                    robot_state.copyJointGroupPositions(joint_model_group, seed_state);
+                    for (auto& val : seed_state)
+                        val += (rand() % 200 - 100) * 0.1;
+                    robot_state.setJointGroupPositions(joint_model_group, seed_state);
+                    robot_state.update();
+                }
+                found_ik = robot_state.setFromIK(joint_model_group, nudged, end_effector_link);
+            }
         }
     }
-    
+
     if (!found_ik) {
         joint_values.clear();
         return false;
@@ -405,10 +413,40 @@ private:
         bool ik_success = computeIK(*arm_, target_pose, all_target_joint_values, all_ik_joint_names);
         
         if (!ik_success) {
-            RCLCPP_ERROR(this->get_logger(), "IK solution not found");
+            // Detailed diagnostics for KDL IK failure
+            RCLCPP_ERROR(this->get_logger(), "IK solution not found (KDL kinematics plugin)");
+            RCLCPP_ERROR(this->get_logger(), "  Target pose (frame: %s): position x=%.4f y=%.4f z=%.4f",
+                target_pose.header.frame_id.c_str(),
+                target_pose.pose.position.x, target_pose.pose.position.y, target_pose.pose.position.z);
+            RCLCPP_ERROR(this->get_logger(), "  Target orientation: w=%.4f x=%.4f y=%.4f z=%.4f",
+                target_pose.pose.orientation.w, target_pose.pose.orientation.x,
+                target_pose.pose.orientation.y, target_pose.pose.orientation.z);
+            try {
+                moveit::core::RobotStatePtr cur = arm_->getCurrentState();
+                if (cur) {
+                    std::vector<double> cur_joints;
+                    const moveit::core::JointModelGroup* jmg = arm_->getRobotModel()->getJointModelGroup(arm_->getName());
+                    if (jmg) {
+                        cur->copyJointGroupPositions(jmg, cur_joints);
+                        geometry_msgs::msg::PoseStamped current_pose;
+                        if (computeFK(*arm_, cur_joints, current_pose)) {
+                            double dx = target_pose.pose.position.x - current_pose.pose.position.x;
+                            double dy = target_pose.pose.position.y - current_pose.pose.position.y;
+                            double dz = target_pose.pose.position.z - current_pose.pose.position.z;
+                            double dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+                            RCLCPP_ERROR(this->get_logger(), "  Current EE position: x=%.4f y=%.4f z=%.4f (distance to target: %.4f m)",
+                                current_pose.pose.position.x, current_pose.pose.position.y, current_pose.pose.position.z, dist);
+                        }
+                    }
+                }
+            } catch (const std::exception& e) {
+                RCLCPP_ERROR(this->get_logger(), "  (Could not get current state for diagnostics: %s)", e.what());
+            }
+            RCLCPP_ERROR(this->get_logger(), "  Possible causes: target outside workspace, near singularity, or joint limits. "
+                "Tried 100 seeds plus position nudges. Try TRAC-IK (see g_arm_moveit2/TRAC_IK_SETUP.md) or adjust kinematics.yaml.");
             result->success = false;
             result->error_code = 3;
-            result->message = "IK solution not found - pose may be unreachable";
+            result->message = "IK solution not found - pose may be unreachable (see log for target pose and diagnostics)";
             goal_handle->abort(result);
             return;
         }
@@ -771,6 +809,9 @@ private:
         feedback->state = "VERIFYING";
         feedback->detail = "Verifying final pose...";
         goal_handle->publish_feedback(feedback);
+        
+        // Brief delay so /joint_states reflects settled position (avoids large spurious pos_error)
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
         
         // Get final joint state
         std::vector<double> final_joint_values;
