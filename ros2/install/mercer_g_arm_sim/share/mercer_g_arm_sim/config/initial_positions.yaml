@@ -1,8 +1,0 @@
-# Initial positions for g_arm's ros2_control in Gazebo simulation
-
-initial_positions:
-  joint1: 0.0
-  joint2: 0.0
-  joint3: 0.0
-  jointPWM: 0.0
-

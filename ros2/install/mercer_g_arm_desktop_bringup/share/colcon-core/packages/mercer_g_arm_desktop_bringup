@@ -1,1 +1,0 @@
-joint_state_publisher:joint_state_publisher_gui:launch:launch_ros:mercer_robot_commander_cpp:robot_state_publisher:rqt_gui:rviz2:xacro

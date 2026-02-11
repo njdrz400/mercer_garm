@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/scott/mercer_garm/ros2/build/g_arm_msgs/cmake_install.cmake",
-		"/home/scott/mercer_garm/ros2/build/g_arm_msgs/g_arm_msgs__py/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/scott/mercer_garm/ros2/build/pi_gpio_interface/cmake_install.cmake",
-		"/home/scott/mercer_garm/ros2/build/pi_gpio_interface/pi_gpio_interface__py/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

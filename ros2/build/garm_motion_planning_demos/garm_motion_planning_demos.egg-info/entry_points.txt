@@ -1,2 +1,0 @@
-[console_scripts]
-garm_motion_planning_node = garm_motion_planning_demos.garm_motion_planning_node:main

@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/scott/mercer_garm/ros2/build/mercer_robot_commander_cpp/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

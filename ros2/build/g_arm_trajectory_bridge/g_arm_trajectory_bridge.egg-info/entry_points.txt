@@ -1,2 +1,0 @@
-[console_scripts]
-bridge = g_arm_trajectory_bridge.bridge_node:main
