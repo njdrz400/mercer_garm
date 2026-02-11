@@ -1,0 +1,2 @@
+source;share/mercer_robot_commander_cpp/environment/ament_prefix_path.sh
+source;share/mercer_robot_commander_cpp/environment/path.sh

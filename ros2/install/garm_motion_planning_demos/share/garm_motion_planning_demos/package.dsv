@@ -1,0 +1,6 @@
+source;share/garm_motion_planning_demos/hook/pythonpath.ps1
+source;share/garm_motion_planning_demos/hook/pythonpath.dsv
+source;share/garm_motion_planning_demos/hook/pythonpath.sh
+source;share/garm_motion_planning_demos/hook/ament_prefix_path.ps1
+source;share/garm_motion_planning_demos/hook/ament_prefix_path.dsv
+source;share/garm_motion_planning_demos/hook/ament_prefix_path.sh

@@ -1,0 +1,4 @@
+source;share/mercer_g_arm_topic_hw/local_setup.bash
+source;share/mercer_g_arm_topic_hw/local_setup.dsv
+source;share/mercer_g_arm_topic_hw/local_setup.sh
+source;share/mercer_g_arm_topic_hw/local_setup.zsh

@@ -1,0 +1,57 @@
+-- The C compiler identification is GNU 13.3.0
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ament_cmake: 2.5.5 (/opt/ros/jazzy/share/ament_cmake/cmake)
+-- Found Python3: /home/scott/ros2_venv/bin/python3 (found version "3.12.3") found components: Interpreter
+-- Found rclcpp: 28.1.16 (/opt/ros/jazzy/share/rclcpp/cmake)
+-- Found rosidl_generator_c: 4.6.7 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+-- Found rosidl_generator_cpp: 4.6.7 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+-- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+-- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+-- Found rmw_implementation_cmake: 7.3.3 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+-- Found rmw_fastrtps_cpp: 8.4.3 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+-- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.13")
+-- Found FastRTPS: /opt/ros/jazzy/include (Required is at least version "2.13")
+-- Using RMW implementation 'rmw_fastrtps_cpp' as default
+-- Found hardware_interface: 4.42.2 (/opt/ros/jazzy/share/hardware_interface/cmake)
+-- Configuring done (7.0s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/scott/mercer_garm/ros2/build/mercer_g_arm_topic_hw
+[ 50%] [32mBuilding CXX object CMakeFiles/mercer_g_arm_topic_hw.dir/src/topic_system.cpp.o[0m
+[100%] [1m[32mLinking CXX shared library libmercer_g_arm_topic_hw.so[0m
+[100%] Built target mercer_g_arm_topic_hw
+-- Install configuration: ""
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/mercer_g_arm_topic_hw_plugins.xml
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/lib/libmercer_g_arm_topic_hw.so
+-- Set non-toolchain portion of runtime path of "/home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/lib/libmercer_g_arm_topic_hw.so" to ""
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/include/
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/include//mercer_g_arm_topic_hw
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/include//mercer_g_arm_topic_hw/topic_system.hpp
+-- Up-to-date: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/mercer_g_arm_topic_hw_plugins.xml
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/launch
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/launch/topic_hw.launch.py
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/ament_index/resource_index/package_run_dependencies/mercer_g_arm_topic_hw
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/ament_index/resource_index/parent_prefix_path/mercer_g_arm_topic_hw
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/environment/ament_prefix_path.sh
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/environment/ament_prefix_path.dsv
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/environment/path.sh
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/environment/path.dsv
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/local_setup.bash
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/local_setup.sh
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/local_setup.zsh
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/local_setup.dsv
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/package.dsv
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/ament_index/resource_index/packages/mercer_g_arm_topic_hw
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/ament_index/resource_index/hardware_interface__pluginlib__plugin/mercer_g_arm_topic_hw
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/cmake/mercer_g_arm_topic_hwConfig.cmake
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/cmake/mercer_g_arm_topic_hwConfig-version.cmake
+-- Installing: /home/scott/mercer_garm/ros2/install/mercer_g_arm_topic_hw/share/mercer_g_arm_topic_hw/package.xml

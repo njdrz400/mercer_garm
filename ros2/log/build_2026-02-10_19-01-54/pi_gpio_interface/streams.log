@@ -1,0 +1,152 @@
+[0.029s] Invoking command in '/home/scott/mercer_garm/ros2/build/pi_gpio_interface': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/scott/mercer_garm/ros2/install/mercer_robot_commander_py:/home/scott/mercer_garm/ros2/install/mercer_g_arm_desktop_bringup:/home/scott/mercer_garm/ros2/install/mercer_g_arm_sim:/home/scott/mercer_garm/ros2/install/mercer_g_arm_rpi_bringup:/home/scott/mercer_garm/ros2/install/mercer_g_arm:/home/scott/mercer_garm/ros2/install/mercer_g-arm_rpi_bringup:/home/scott/mercer_garm/ros2/install/mercer_g-arm_desktop_bringup:/home/scott/mercer_garm/ros2/install/joy_js_pkg:/home/scott/mercer_garm/ros2/install/garm_motion_planning_demos:/home/scott/mercer_garm/ros2/install/g_arm_trajectory_bridge:/home/scott/mercer_garm/ros2/install/g_arm_python_examples:/home/scott/mercer_garm/ros2/install/g-arm_simulation:/home/scott/mercer_garm/ros2/install/g_arm:/home/scott/mercer_garm_ws/install/mercer_g_arm_desktop_bringup:/home/scott/mercer_garm_ws/install/mercer_robot_commander_py:/home/scott/mercer_garm_ws/install/mercer_g_arm_sim:/home/scott/mercer_garm_ws/install/mercer_g_arm_rpi_bringup:/home/scott/mercer_garm_ws/install/mercer_g_arm:/home/scott/mercer_garm_ws/install/mercer_g-arm_rpi_bringup:/home/scott/mercer_garm_ws/install/mercer_g-arm_desktop_bringup:/home/scott/mercer_garm_ws/install/joy_js_pkg:/home/scott/mercer_garm_ws/install/garm_motion_planning_demos:/home/scott/mercer_garm_ws/install/g_arm_trajectory_bridge:/home/scott/mercer_garm_ws/install/g_arm_python_examples:/home/scott/mercer_garm_ws/install/g-arm_simulation:/home/scott/mercer_garm_ws/install/g_arm:/home/scott/ros2_ws/install/joy_js_pkg:/home/scott/ros2_ws/install/garm_motion_planning_demos:/home/scott/ros2_ws/install/g_arm_trajectory_bridge:/home/scott/ros2_ws/install/g_arm_python_examples:/home/scott/ros2_ws/install/g-arm_simulation:/home/scott/ros2_ws/install/g_arm:/home/scott/ws_moveit/install/moveit_configs_utils:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PS1=(ros2_venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ VIRTUAL_ENV_PROMPT=(ros2_venv) /snap/bin/cmake --build /home/scott/mercer_garm/ros2/build/pi_gpio_interface -- -j4 -l4
+[0.181s] [  2%] Built target pi_gpio_interface__rosidl_generator_type_description
+[0.234s] [ 17%] Built target pi_gpio_interface__rosidl_generator_c
+[0.263s] [ 17%] Built target ament_cmake_python_copy_pi_gpio_interface
+[0.266s] [ 20%] Built target pi_gpio_interface__cpp
+[0.266s] [ 29%] Built target pi_gpio_interface__rosidl_typesupport_introspection_c
+[0.275s] [ 38%] Built target pi_gpio_interface__rosidl_typesupport_fastrtps_c
+[0.298s] [ 47%] Built target pi_gpio_interface__rosidl_typesupport_c
+[0.313s] [ 55%] Built target pi_gpio_interface__rosidl_typesupport_fastrtps_cpp
+[0.342s] [ 64%] Built target pi_gpio_interface__rosidl_typesupport_introspection_cpp
+[0.352s] [ 73%] Built target pi_gpio_interface__rosidl_typesupport_cpp
+[0.374s] [ 73%] Built target pi_gpio_interface
+[0.404s] [ 76%] Built target pi_gpio_interface__py
+[0.438s] [ 82%] Built target pi_gpio_interface__rosidl_generator_py
+[0.478s] [ 88%] Built target pi_gpio_interface_s__rosidl_typesupport_fastrtps_c
+[0.481s] [ 94%] Built target pi_gpio_interface_s__rosidl_typesupport_c
+[0.482s] [100%] Built target pi_gpio_interface_s__rosidl_typesupport_introspection_c
+[0.608s] running egg_info
+[0.627s] writing pi_gpio_interface.egg-info/PKG-INFO
+[0.627s] writing dependency_links to pi_gpio_interface.egg-info/dependency_links.txt
+[0.627s] writing top-level names to pi_gpio_interface.egg-info/top_level.txt
+[0.684s] reading manifest file 'pi_gpio_interface.egg-info/SOURCES.txt'
+[0.698s] writing manifest file 'pi_gpio_interface.egg-info/SOURCES.txt'
+[0.747s] [100%] Built target ament_cmake_python_build_pi_gpio_interface_egg
+[0.752s] Invoked command in '/home/scott/mercer_garm/ros2/build/pi_gpio_interface' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/scott/mercer_garm/ros2/install/mercer_robot_commander_py:/home/scott/mercer_garm/ros2/install/mercer_g_arm_desktop_bringup:/home/scott/mercer_garm/ros2/install/mercer_g_arm_sim:/home/scott/mercer_garm/ros2/install/mercer_g_arm_rpi_bringup:/home/scott/mercer_garm/ros2/install/mercer_g_arm:/home/scott/mercer_garm/ros2/install/mercer_g-arm_rpi_bringup:/home/scott/mercer_garm/ros2/install/mercer_g-arm_desktop_bringup:/home/scott/mercer_garm/ros2/install/joy_js_pkg:/home/scott/mercer_garm/ros2/install/garm_motion_planning_demos:/home/scott/mercer_garm/ros2/install/g_arm_trajectory_bridge:/home/scott/mercer_garm/ros2/install/g_arm_python_examples:/home/scott/mercer_garm/ros2/install/g-arm_simulation:/home/scott/mercer_garm/ros2/install/g_arm:/home/scott/mercer_garm_ws/install/mercer_g_arm_desktop_bringup:/home/scott/mercer_garm_ws/install/mercer_robot_commander_py:/home/scott/mercer_garm_ws/install/mercer_g_arm_sim:/home/scott/mercer_garm_ws/install/mercer_g_arm_rpi_bringup:/home/scott/mercer_garm_ws/install/mercer_g_arm:/home/scott/mercer_garm_ws/install/mercer_g-arm_rpi_bringup:/home/scott/mercer_garm_ws/install/mercer_g-arm_desktop_bringup:/home/scott/mercer_garm_ws/install/joy_js_pkg:/home/scott/mercer_garm_ws/install/garm_motion_planning_demos:/home/scott/mercer_garm_ws/install/g_arm_trajectory_bridge:/home/scott/mercer_garm_ws/install/g_arm_python_examples:/home/scott/mercer_garm_ws/install/g-arm_simulation:/home/scott/mercer_garm_ws/install/g_arm:/home/scott/ros2_ws/install/joy_js_pkg:/home/scott/ros2_ws/install/garm_motion_planning_demos:/home/scott/ros2_ws/install/g_arm_trajectory_bridge:/home/scott/ros2_ws/install/g_arm_python_examples:/home/scott/ros2_ws/install/g-arm_simulation:/home/scott/ros2_ws/install/g_arm:/home/scott/ws_moveit/install/moveit_configs_utils:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PS1=(ros2_venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ VIRTUAL_ENV_PROMPT=(ros2_venv) /snap/bin/cmake --build /home/scott/mercer_garm/ros2/build/pi_gpio_interface -- -j4 -l4
+[0.769s] Invoking command in '/home/scott/mercer_garm/ros2/build/pi_gpio_interface': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/scott/mercer_garm/ros2/install/mercer_robot_commander_py:/home/scott/mercer_garm/ros2/install/mercer_g_arm_desktop_bringup:/home/scott/mercer_garm/ros2/install/mercer_g_arm_sim:/home/scott/mercer_garm/ros2/install/mercer_g_arm_rpi_bringup:/home/scott/mercer_garm/ros2/install/mercer_g_arm:/home/scott/mercer_garm/ros2/install/mercer_g-arm_rpi_bringup:/home/scott/mercer_garm/ros2/install/mercer_g-arm_desktop_bringup:/home/scott/mercer_garm/ros2/install/joy_js_pkg:/home/scott/mercer_garm/ros2/install/garm_motion_planning_demos:/home/scott/mercer_garm/ros2/install/g_arm_trajectory_bridge:/home/scott/mercer_garm/ros2/install/g_arm_python_examples:/home/scott/mercer_garm/ros2/install/g-arm_simulation:/home/scott/mercer_garm/ros2/install/g_arm:/home/scott/mercer_garm_ws/install/mercer_g_arm_desktop_bringup:/home/scott/mercer_garm_ws/install/mercer_robot_commander_py:/home/scott/mercer_garm_ws/install/mercer_g_arm_sim:/home/scott/mercer_garm_ws/install/mercer_g_arm_rpi_bringup:/home/scott/mercer_garm_ws/install/mercer_g_arm:/home/scott/mercer_garm_ws/install/mercer_g-arm_rpi_bringup:/home/scott/mercer_garm_ws/install/mercer_g-arm_desktop_bringup:/home/scott/mercer_garm_ws/install/joy_js_pkg:/home/scott/mercer_garm_ws/install/garm_motion_planning_demos:/home/scott/mercer_garm_ws/install/g_arm_trajectory_bridge:/home/scott/mercer_garm_ws/install/g_arm_python_examples:/home/scott/mercer_garm_ws/install/g-arm_simulation:/home/scott/mercer_garm_ws/install/g_arm:/home/scott/ros2_ws/install/joy_js_pkg:/home/scott/ros2_ws/install/garm_motion_planning_demos:/home/scott/ros2_ws/install/g_arm_trajectory_bridge:/home/scott/ros2_ws/install/g_arm_python_examples:/home/scott/ros2_ws/install/g-arm_simulation:/home/scott/ros2_ws/install/g_arm:/home/scott/ws_moveit/install/moveit_configs_utils:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PS1=(ros2_venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ VIRTUAL_ENV_PROMPT=(ros2_venv) /snap/bin/cmake --install /home/scott/mercer_garm/ros2/build/pi_gpio_interface
+[0.856s] -- Install configuration: ""
+[0.856s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/ament_index/resource_index/rosidl_interfaces/pi_gpio_interface
+[0.856s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/action/GPIO.json
+[0.856s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface
+[0.856s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action
+[0.857s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/gpio.h
+[0.857s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail
+[0.857s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__functions.c
+[0.857s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__struct.h
+[0.857s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__description.c
+[0.857s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__functions.h
+[0.857s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__type_support.h
+[0.858s] -- Installing: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__type_support.c
+[0.866s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg
+[0.866s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg/rosidl_generator_c__visibility_control.h
+[0.866s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/environment/library_path.sh
+[0.867s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/environment/library_path.dsv
+[0.882s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/libpi_gpio_interface__rosidl_generator_c.so
+[0.882s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface
+[0.891s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action
+[0.897s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail
+[0.897s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__rosidl_typesupport_fastrtps_c.h
+[0.898s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg
+[0.898s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg/rosidl_typesupport_fastrtps_c__visibility_control.h
+[0.904s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/libpi_gpio_interface__rosidl_typesupport_fastrtps_c.so
+[0.904s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface
+[0.905s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action
+[0.905s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail
+[0.905s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__rosidl_typesupport_introspection_c.h
+[0.905s] -- Installing: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__type_support.c
+[0.911s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg
+[0.911s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg/rosidl_typesupport_introspection_c__visibility_control.h
+[0.912s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/libpi_gpio_interface__rosidl_typesupport_introspection_c.so
+[0.912s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/libpi_gpio_interface__rosidl_typesupport_c.so
+[0.913s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface
+[0.913s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action
+[0.913s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail
+[0.914s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__builder.hpp
+[0.914s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__struct.hpp
+[0.914s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__traits.hpp
+[0.914s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__type_support.hpp
+[0.914s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/gpio.hpp
+[0.914s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg
+[0.915s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg/rosidl_generator_cpp__visibility_control.hpp
+[0.915s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface
+[0.915s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action
+[0.915s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail
+[0.915s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__rosidl_typesupport_fastrtps_cpp.hpp
+[0.916s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/dds_fastrtps
+[0.916s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg
+[0.916s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/msg/rosidl_typesupport_fastrtps_cpp__visibility_control.h
+[0.928s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/libpi_gpio_interface__rosidl_typesupport_fastrtps_cpp.so
+[0.929s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface
+[0.929s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action
+[0.929s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail
+[0.930s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__rosidl_typesupport_introspection_cpp.hpp
+[0.930s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/include/pi_gpio_interface/pi_gpio_interface/action/detail/gpio__type_support.cpp
+[0.942s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/libpi_gpio_interface__rosidl_typesupport_introspection_cpp.so
+[0.951s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/libpi_gpio_interface__rosidl_typesupport_cpp.so
+[0.951s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/environment/pythonpath.sh
+[0.951s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/environment/pythonpath.dsv
+[0.951s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface-0.0.1-py3.12.egg-info
+[0.951s] -- Installing: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface-0.0.1-py3.12.egg-info/top_level.txt
+[0.952s] -- Installing: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface-0.0.1-py3.12.egg-info/dependency_links.txt
+[0.952s] -- Installing: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface-0.0.1-py3.12.egg-info/SOURCES.txt
+[0.952s] -- Installing: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface-0.0.1-py3.12.egg-info/PKG-INFO
+[0.953s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface
+[0.953s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/_pi_gpio_interface_s.ep.rosidl_typesupport_fastrtps_c.c
+[0.953s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/__init__.py
+[0.953s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/pi_gpio_interface_s__rosidl_typesupport_c.so
+[0.953s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/action
+[0.954s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/action/__init__.py
+[0.954s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/action/_gpio_s.c
+[0.954s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/action/_gpio.py
+[0.954s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/pi_gpio_interface_s__rosidl_typesupport_introspection_c.so
+[0.954s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/_pi_gpio_interface_s.ep.rosidl_typesupport_c.c
+[0.958s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/_pi_gpio_interface_s.ep.rosidl_typesupport_introspection_c.c
+[0.958s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/pi_gpio_interface_s__rosidl_typesupport_fastrtps_c.so
+[1.016s] Listing '/home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface'...
+[1.016s] Listing '/home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/action'...
+[1.039s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/pi_gpio_interface_s__rosidl_typesupport_fastrtps_c.so
+[1.042s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/pi_gpio_interface_s__rosidl_typesupport_introspection_c.so
+[1.051s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/python3.12/site-packages/pi_gpio_interface/pi_gpio_interface_s__rosidl_typesupport_c.so
+[1.052s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/lib/libpi_gpio_interface__rosidl_generator_py.so
+[1.052s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/action/GPIO.idl
+[1.052s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/action/GPIO.action
+[1.052s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/ament_index/resource_index/package_run_dependencies/pi_gpio_interface
+[1.052s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/ament_index/resource_index/parent_prefix_path/pi_gpio_interface
+[1.053s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/environment/ament_prefix_path.sh
+[1.053s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/environment/ament_prefix_path.dsv
+[1.053s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/environment/path.sh
+[1.053s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/environment/path.dsv
+[1.053s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/local_setup.bash
+[1.053s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/local_setup.sh
+[1.053s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/local_setup.zsh
+[1.053s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/local_setup.dsv
+[1.053s] -- Installing: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/package.dsv
+[1.054s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/ament_index/resource_index/packages/pi_gpio_interface
+[1.055s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/export_pi_gpio_interface__rosidl_generator_cExport.cmake
+[1.056s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/export_pi_gpio_interface__rosidl_generator_cExport-noconfig.cmake
+[1.060s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/export_pi_gpio_interface__rosidl_typesupport_fastrtps_cExport.cmake
+[1.060s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/export_pi_gpio_interface__rosidl_typesupport_fastrtps_cExport-noconfig.cmake
+[1.063s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interface__rosidl_typesupport_introspection_cExport.cmake
+[1.063s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interface__rosidl_typesupport_introspection_cExport-noconfig.cmake
+[1.064s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interface__rosidl_typesupport_cExport.cmake
+[1.064s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interface__rosidl_typesupport_cExport-noconfig.cmake
+[1.065s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/export_pi_gpio_interface__rosidl_generator_cppExport.cmake
+[1.066s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/export_pi_gpio_interface__rosidl_typesupport_fastrtps_cppExport.cmake
+[1.066s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/export_pi_gpio_interface__rosidl_typesupport_fastrtps_cppExport-noconfig.cmake
+[1.071s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interface__rosidl_typesupport_introspection_cppExport.cmake
+[1.072s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interface__rosidl_typesupport_introspection_cppExport-noconfig.cmake
+[1.086s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interface__rosidl_typesupport_cppExport.cmake
+[1.086s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interface__rosidl_typesupport_cppExport-noconfig.cmake
+[1.086s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/export_pi_gpio_interface__rosidl_generator_pyExport.cmake
+[1.086s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/export_pi_gpio_interface__rosidl_generator_pyExport-noconfig.cmake
+[1.087s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/rosidl_cmake-extras.cmake
+[1.087s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/ament_cmake_export_dependencies-extras.cmake
+[1.087s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/ament_cmake_export_include_directories-extras.cmake
+[1.087s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/ament_cmake_export_libraries-extras.cmake
+[1.087s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/ament_cmake_export_targets-extras.cmake
+[1.087s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/rosidl_cmake_export_typesupport_targets-extras.cmake
+[1.088s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/rosidl_cmake_export_typesupport_libraries-extras.cmake
+[1.088s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interfaceConfig.cmake
+[1.088s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/cmake/pi_gpio_interfaceConfig-version.cmake
+[1.088s] -- Up-to-date: /home/scott/mercer_garm/ros2/install/pi_gpio_interface/share/pi_gpio_interface/package.xml
+[1.255s] Invoked command in '/home/scott/mercer_garm/ros2/build/pi_gpio_interface' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/scott/mercer_garm/ros2/install/mercer_robot_commander_py:/home/scott/mercer_garm/ros2/install/mercer_g_arm_desktop_bringup:/home/scott/mercer_garm/ros2/install/mercer_g_arm_sim:/home/scott/mercer_garm/ros2/install/mercer_g_arm_rpi_bringup:/home/scott/mercer_garm/ros2/install/mercer_g_arm:/home/scott/mercer_garm/ros2/install/mercer_g-arm_rpi_bringup:/home/scott/mercer_garm/ros2/install/mercer_g-arm_desktop_bringup:/home/scott/mercer_garm/ros2/install/joy_js_pkg:/home/scott/mercer_garm/ros2/install/garm_motion_planning_demos:/home/scott/mercer_garm/ros2/install/g_arm_trajectory_bridge:/home/scott/mercer_garm/ros2/install/g_arm_python_examples:/home/scott/mercer_garm/ros2/install/g-arm_simulation:/home/scott/mercer_garm/ros2/install/g_arm:/home/scott/mercer_garm_ws/install/mercer_g_arm_desktop_bringup:/home/scott/mercer_garm_ws/install/mercer_robot_commander_py:/home/scott/mercer_garm_ws/install/mercer_g_arm_sim:/home/scott/mercer_garm_ws/install/mercer_g_arm_rpi_bringup:/home/scott/mercer_garm_ws/install/mercer_g_arm:/home/scott/mercer_garm_ws/install/mercer_g-arm_rpi_bringup:/home/scott/mercer_garm_ws/install/mercer_g-arm_desktop_bringup:/home/scott/mercer_garm_ws/install/joy_js_pkg:/home/scott/mercer_garm_ws/install/garm_motion_planning_demos:/home/scott/mercer_garm_ws/install/g_arm_trajectory_bridge:/home/scott/mercer_garm_ws/install/g_arm_python_examples:/home/scott/mercer_garm_ws/install/g-arm_simulation:/home/scott/mercer_garm_ws/install/g_arm:/home/scott/ros2_ws/install/joy_js_pkg:/home/scott/ros2_ws/install/garm_motion_planning_demos:/home/scott/ros2_ws/install/g_arm_trajectory_bridge:/home/scott/ros2_ws/install/g_arm_python_examples:/home/scott/ros2_ws/install/g-arm_simulation:/home/scott/ros2_ws/install/g_arm:/home/scott/ws_moveit/install/moveit_configs_utils:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PS1=(ros2_venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ VIRTUAL_ENV_PROMPT=(ros2_venv) /snap/bin/cmake --install /home/scott/mercer_garm/ros2/build/pi_gpio_interface

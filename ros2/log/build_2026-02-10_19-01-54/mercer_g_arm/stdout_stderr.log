@@ -1,0 +1,19 @@
+running egg_info
+writing ../../build/mercer_g_arm/mercer_g_arm.egg-info/PKG-INFO
+writing dependency_links to ../../build/mercer_g_arm/mercer_g_arm.egg-info/dependency_links.txt
+writing entry points to ../../build/mercer_g_arm/mercer_g_arm.egg-info/entry_points.txt
+writing requirements to ../../build/mercer_g_arm/mercer_g_arm.egg-info/requires.txt
+writing top-level names to ../../build/mercer_g_arm/mercer_g_arm.egg-info/top_level.txt
+reading manifest file '../../build/mercer_g_arm/mercer_g_arm.egg-info/SOURCES.txt'
+writing manifest file '../../build/mercer_g_arm/mercer_g_arm.egg-info/SOURCES.txt'
+running build
+running build_py
+running install
+running install_lib
+running install_data
+running install_egg_info
+removing '/home/scott/mercer_garm/ros2/install/mercer_g_arm/lib/python3.12/site-packages/mercer_g_arm-0.0.0-py3.12.egg-info' (and everything under it)
+Copying ../../build/mercer_g_arm/mercer_g_arm.egg-info to /home/scott/mercer_garm/ros2/install/mercer_g_arm/lib/python3.12/site-packages/mercer_g_arm-0.0.0-py3.12.egg-info
+running install_scripts
+Installing driver script to /home/scott/mercer_garm/ros2/install/mercer_g_arm/lib/mercer_g_arm
+writing list of installed files to '/home/scott/mercer_garm/ros2/build/mercer_g_arm/install.log'

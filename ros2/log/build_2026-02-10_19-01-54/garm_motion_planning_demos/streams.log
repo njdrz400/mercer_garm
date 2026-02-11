@@ -1,0 +1,21 @@
+[2.209s] Invoking command in '/home/scott/mercer_garm/ros2/src/garm_motion_planning_demos': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PS1=(ros2_venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ PYTHONPATH=/home/scott/mercer_garm/ros2/build/garm_motion_planning_demos/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/scott/mercer_garm/ros2/install/garm_motion_planning_demos/lib/python3.12/site-packages:${PYTHONPATH} VIRTUAL_ENV_PROMPT=(ros2_venv) /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/garm_motion_planning_demos build --build-base /home/scott/mercer_garm/ros2/build/garm_motion_planning_demos/build install --record /home/scott/mercer_garm/ros2/build/garm_motion_planning_demos/install.log --single-version-externally-managed install_data
+[2.688s] running egg_info
+[2.728s] writing ../../build/garm_motion_planning_demos/garm_motion_planning_demos.egg-info/PKG-INFO
+[2.729s] writing dependency_links to ../../build/garm_motion_planning_demos/garm_motion_planning_demos.egg-info/dependency_links.txt
+[2.729s] writing entry points to ../../build/garm_motion_planning_demos/garm_motion_planning_demos.egg-info/entry_points.txt
+[2.729s] writing requirements to ../../build/garm_motion_planning_demos/garm_motion_planning_demos.egg-info/requires.txt
+[2.729s] writing top-level names to ../../build/garm_motion_planning_demos/garm_motion_planning_demos.egg-info/top_level.txt
+[2.835s] reading manifest file '../../build/garm_motion_planning_demos/garm_motion_planning_demos.egg-info/SOURCES.txt'
+[2.851s] writing manifest file '../../build/garm_motion_planning_demos/garm_motion_planning_demos.egg-info/SOURCES.txt'
+[2.851s] running build
+[2.851s] running build_py
+[2.852s] running install
+[2.862s] running install_lib
+[2.903s] running install_data
+[2.903s] running install_egg_info
+[2.946s] removing '/home/scott/mercer_garm/ros2/install/garm_motion_planning_demos/lib/python3.12/site-packages/garm_motion_planning_demos-0.0.0-py3.12.egg-info' (and everything under it)
+[2.947s] Copying ../../build/garm_motion_planning_demos/garm_motion_planning_demos.egg-info to /home/scott/mercer_garm/ros2/install/garm_motion_planning_demos/lib/python3.12/site-packages/garm_motion_planning_demos-0.0.0-py3.12.egg-info
+[2.948s] running install_scripts
+[3.206s] Installing garm_motion_planning_node script to /home/scott/mercer_garm/ros2/install/garm_motion_planning_demos/lib/garm_motion_planning_demos
+[3.206s] writing list of installed files to '/home/scott/mercer_garm/ros2/build/garm_motion_planning_demos/install.log'
+[3.251s] Invoked command in '/home/scott/mercer_garm/ros2/src/garm_motion_planning_demos' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PS1=(ros2_venv) \[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ PYTHONPATH=/home/scott/mercer_garm/ros2/build/garm_motion_planning_demos/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/scott/mercer_garm/ros2/install/garm_motion_planning_demos/lib/python3.12/site-packages:${PYTHONPATH} VIRTUAL_ENV_PROMPT=(ros2_venv) /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/garm_motion_planning_demos build --build-base /home/scott/mercer_garm/ros2/build/garm_motion_planning_demos/build install --record /home/scott/mercer_garm/ros2/build/garm_motion_planning_demos/install.log --single-version-externally-managed install_data

@@ -1,0 +1,87 @@
+[0mCMake Deprecation Warning at CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+[0m
+-- The C compiler identification is GNU 13.3.0
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ament_cmake: 2.5.5 (/opt/ros/jazzy/share/ament_cmake/cmake)
+-- Found Python3: /home/scott/ros2_venv/bin/python3 (found version "3.12.3") found components: Interpreter
+-- Found ament_lint_auto: 0.17.4 (/opt/ros/jazzy/share/ament_lint_auto/cmake)
+-- Added test 'copyright' to check source files copyright and LICENSE
+-- Added test 'flake8' to check Python code syntax and style conventions
+-- Configured 'flake8' exclude dirs and/or files: 
+-- Added test 'lint_cmake' to check CMake code style
+-- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+-- Added test 'xmllint' to check XML markup files
+-- Configuring done (4.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/scott/mercer_garm/ros2/build/g_arm_description
+-- Install configuration: ""
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/launch
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/launch/display.launch.py
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/launch/__pycache__
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/launch/__pycache__/display_tool.launch.cpython-312.pyc
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/launch/__pycache__/display.launch.cpython-312.pyc
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/launch/display_tool.launch.py
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/parallel_end_link1.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/elbow.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/base.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/electromagnet.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/link1.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/link2.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/link1.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/parallel_end_link1.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/link_j3_rod.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/end.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/motors.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/link_j3_rod.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/parallel_end_link2.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/link_j3_lever.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/link2.dae
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/elbow.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/parallel_end_link2.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/electromagnet.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/end.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/link_j3_lever.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/meshes/motors.stl
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/rviz
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/rviz/urdf.rviz
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/urdf
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/urdf/robot_electromagnet.urdf.xacro
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/urdf/robot.urdf.xacro.backup
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/urdf/g_arm_ros2_control.xacro
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/urdf/robot.urdf
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/urdf/msa_qt_debug.log
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/urdf/robot_electromagnet.urdf
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/urdf/robot.urdf.xacro
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/ament_index/resource_index/package_run_dependencies/g_arm_description
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/ament_index/resource_index/parent_prefix_path/g_arm_description
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/environment/ament_prefix_path.sh
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/environment/ament_prefix_path.dsv
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/environment/path.sh
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/environment/path.dsv
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/local_setup.bash
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/local_setup.sh
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/local_setup.zsh
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/local_setup.dsv
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/package.dsv
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/ament_index/resource_index/packages/g_arm_description
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/cmake/g_arm_descriptionConfig.cmake
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/cmake/g_arm_descriptionConfig-version.cmake
+-- Installing: /home/scott/mercer_garm/ros2/install/g_arm_description/share/g_arm_description/package.xml

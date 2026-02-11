@@ -1,0 +1,17 @@
+package.xml
+setup.cfg
+setup.py
+../../build/g_arm_trajectory_bridge/g_arm_trajectory_bridge.egg-info/PKG-INFO
+../../build/g_arm_trajectory_bridge/g_arm_trajectory_bridge.egg-info/SOURCES.txt
+../../build/g_arm_trajectory_bridge/g_arm_trajectory_bridge.egg-info/dependency_links.txt
+../../build/g_arm_trajectory_bridge/g_arm_trajectory_bridge.egg-info/entry_points.txt
+../../build/g_arm_trajectory_bridge/g_arm_trajectory_bridge.egg-info/requires.txt
+../../build/g_arm_trajectory_bridge/g_arm_trajectory_bridge.egg-info/top_level.txt
+../../build/g_arm_trajectory_bridge/g_arm_trajectory_bridge.egg-info/zip-safe
+g_arm_trajectory_bridge/__init__.py
+g_arm_trajectory_bridge/bridge_node.py
+launch/g_arm_trajectory_bridge.launch.py
+resource/g_arm_trajectory_bridge
+test/test_copyright.py
+test/test_flake8.py
+test/test_pep257.py

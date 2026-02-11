@@ -1,0 +1,6 @@
+{
+  "package_name": "pi_gpio_interface",
+  "non_idl_tuples": [
+    "/home/scott/mercer_garm/ros2/src/pi_gpio_interface:action/GPIO.action"
+  ]
+}

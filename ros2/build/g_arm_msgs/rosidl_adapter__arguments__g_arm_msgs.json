@@ -1,0 +1,6 @@
+{
+  "package_name": "g_arm_msgs",
+  "non_idl_tuples": [
+    "/home/scott/mercer_garm/ros2/src/g_arm_msgs:action/GoToPose.action"
+  ]
+}

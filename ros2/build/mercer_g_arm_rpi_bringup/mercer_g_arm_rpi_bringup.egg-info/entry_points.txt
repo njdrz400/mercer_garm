@@ -1,0 +1,2 @@
+[console_scripts]
+gpio_init = mercer_g_arm_rpi_bringup.gpio_init_node:main

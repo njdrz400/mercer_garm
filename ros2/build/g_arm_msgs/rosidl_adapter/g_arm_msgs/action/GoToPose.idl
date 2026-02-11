@@ -1,0 +1,61 @@
+// generated from rosidl_adapter/resource/action.idl.em
+// with input from g_arm_msgs/action/GoToPose.action
+// generated code does not contain a copyright notice
+
+#include "geometry_msgs/msg/PoseStamped.idl"
+
+module g_arm_msgs {
+  module action {
+    @verbatim (language="comment", text=
+      "Goal fields (inputs)")
+    struct GoToPose_Goal {
+      geometry_msgs::msg::PoseStamped target;
+
+      double pos_tolerance_m;
+
+      double ang_tolerance_rad;
+
+      double timeout_sec;
+
+      boolean allow_orientation;
+
+      string planner_frame;
+
+      double speed_scale;
+
+      double max_joint_vel;
+
+      double max_joint_acc;
+
+      boolean electromagnet_on;
+    };
+    @verbatim (language="comment", text=
+      "Result (final)")
+    struct GoToPose_Result {
+      boolean success;
+
+      int32 error_code;
+
+      string message;
+
+      double final_pos_error_m;
+
+      double final_ang_error_rad;
+
+      sequence<double> final_joint_positions;
+    };
+    @verbatim (language="comment", text=
+      "Feedback (streaming)")
+    struct GoToPose_Feedback {
+      string state;
+
+      double pos_error_m;
+
+      double ang_error_rad;
+
+      double progress;
+
+      string detail;
+    };
+  };
+};

@@ -1,3 +1,8 @@
+# Colcon build artifacts (rebuilt inside image)
+build/
+install/
+log/
+
 # Git and IDE
 .git
 .gitignore

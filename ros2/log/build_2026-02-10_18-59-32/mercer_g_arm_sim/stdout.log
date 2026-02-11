@@ -1,0 +1,51 @@
+running egg_info
+creating ../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info
+writing ../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info/PKG-INFO
+writing dependency_links to ../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info/dependency_links.txt
+writing entry points to ../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info/entry_points.txt
+writing requirements to ../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info/requires.txt
+writing top-level names to ../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info/top_level.txt
+writing manifest file '../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info/SOURCES.txt'
+reading manifest file '../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info/SOURCES.txt'
+writing manifest file '../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/scott/mercer_garm/ros2/build/mercer_g_arm_sim/build
+creating /home/scott/mercer_garm/ros2/build/mercer_g_arm_sim/build/lib
+creating /home/scott/mercer_garm/ros2/build/mercer_g_arm_sim/build/lib/mercer_g_arm_sim
+copying mercer_g_arm_sim/__init__.py -> /home/scott/mercer_garm/ros2/build/mercer_g_arm_sim/build/lib/mercer_g_arm_sim
+copying mercer_g_arm_sim/add_world_to_planning_scene.py -> /home/scott/mercer_garm/ros2/build/mercer_g_arm_sim/build/lib/mercer_g_arm_sim
+running install
+running install_lib
+creating /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/lib/python3.12/site-packages/mercer_g_arm_sim
+copying /home/scott/mercer_garm/ros2/build/mercer_g_arm_sim/build/lib/mercer_g_arm_sim/__init__.py -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/lib/python3.12/site-packages/mercer_g_arm_sim
+copying /home/scott/mercer_garm/ros2/build/mercer_g_arm_sim/build/lib/mercer_g_arm_sim/add_world_to_planning_scene.py -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/lib/python3.12/site-packages/mercer_g_arm_sim
+byte-compiling /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/lib/python3.12/site-packages/mercer_g_arm_sim/__init__.py to __init__.cpython-312.pyc
+byte-compiling /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/lib/python3.12/site-packages/mercer_g_arm_sim/add_world_to_planning_scene.py to add_world_to_planning_scene.cpython-312.pyc
+running install_data
+creating /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/ament_index
+creating /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/ament_index/resource_index
+creating /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/ament_index/resource_index/packages
+copying resource/mercer_g_arm_sim -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/ament_index/resource_index/packages
+copying package.xml -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim
+creating /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/launch
+copying launch/gazebo.launch.py -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/launch
+copying launch/robot_description.launch.py -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/launch
+copying launch/gazebo_moveit.launch.py -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/launch
+creating /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/urdf
+copying urdf/g_arm_gazebo.urdf.xacro -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/urdf
+copying urdf/g_arm_gazebo_inertial_fix.xacro -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/urdf
+copying urdf/g_arm_gazebo_plugins.xacro -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/urdf
+copying urdf/g_arm_gazebo_ros2_control.xacro -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/urdf
+creating /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/config
+copying config/gazebo_ros2_control.yaml -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/config
+copying config/ros2_controllers.yaml -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/config
+copying config/initial_positions.yaml -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/config
+creating /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/worlds
+copying worlds/tiny_wall_world.world -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/worlds
+copying worlds/empty.world -> /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/share/mercer_g_arm_sim/worlds
+running install_egg_info
+Copying ../../build/mercer_g_arm_sim/mercer_g_arm_sim.egg-info to /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/lib/python3.12/site-packages/mercer_g_arm_sim-1.0.0-py3.12.egg-info
+running install_scripts
+Installing add_world_to_planning_scene script to /home/scott/mercer_garm/ros2/install/mercer_g_arm_sim/lib/mercer_g_arm_sim
+writing list of installed files to '/home/scott/mercer_garm/ros2/build/mercer_g_arm_sim/install.log'
