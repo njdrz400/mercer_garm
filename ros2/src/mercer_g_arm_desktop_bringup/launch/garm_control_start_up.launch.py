@@ -21,6 +21,7 @@ from launch.actions import TimerAction
 from launch.actions import DeclareLaunchArgument, RegisterEventHandler, TimerAction, ExecuteProcess
 from launch.event_handlers import OnProcessStart, OnProcessExit
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
@@ -34,11 +35,38 @@ def generate_launch_description():
     model_arg = DeclareLaunchArgument(name='model', default_value=str(default_model_path),
                                       description='Absolute path to robot urdf file')
 
+    use_mock_hardware_arg = DeclareLaunchArgument(
+        'use_mock_hardware',
+        default_value='false',
+        description='If true, use mock hardware (mock_components/GenericSystem) and do not start the real g_arm driver',
+    )
+
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
+    
+    garm_node = Node(
+        package="mercer_g_arm",
+        executable="driver",
+        name="g_arm_driver",
+        output="screen",
+        parameters=[
+            {"X_ZERO_REAL_ANGLE_DEFAULT": 115.0}
+        ],
+        condition=UnlessCondition(LaunchConfiguration("use_mock_hardware")),
+    )
+    
+    
+    
+    # When use_mock_hardware is true, use mock_components so no real driver is needed
+    ros2_control_hardware_type = PythonExpression([
+        "'mock_components/GenericSystem' if '", LaunchConfiguration("use_mock_hardware"), "' == 'true' else 'mercer_g_arm_topic_hw/TopicSystem'"
+    ])
     moveit_config = (
         MoveItConfigsBuilder("g_arm", package_name="g_arm_moveit2")
-        .robot_description(file_path="config/g_arm.urdf.xacro")
+        .robot_description(
+            file_path="config/g_arm.urdf.xacro",
+            mappings={"ros2_control_hardware_type": ros2_control_hardware_type},
+        )
         .robot_description_semantic(file_path="config/g_arm.srdf")
         .robot_description_kinematics(file_path="config/kinematics.yaml")
         .planning_pipelines(pipelines=["ompl"])
@@ -83,7 +111,7 @@ def generate_launch_description():
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[PathJoinSubstitution([FindPackageShare('mercer_g_arm_rpi_bringup'), 'config', 'controllers.yaml'])],
+        parameters=[PathJoinSubstitution([FindPackageShare('mercer_g_arm_desktop_bringup'), 'config', 'controllers.yaml'])],
         remappings=[("~/robot_description", "/robot_description")],
         arguments=['--ros-args', '--log-level', 'info'],
         output="screen",
@@ -183,7 +211,9 @@ def generate_launch_description():
 #        robot_description,
    
  #       delayed_start,
+        use_mock_hardware_arg,
         model_arg,
+        garm_node,
         #joint_state_publisher_node,
         robot_state_publisher_node,
         static_tf_node,

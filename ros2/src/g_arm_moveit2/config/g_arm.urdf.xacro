@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="g_arm">
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+    <xacro:arg name="ros2_control_hardware_type" default="mercer_g_arm_topic_hw/TopicSystem" />
 
     <!-- Import g_arm urdf file -->
     <xacro:include filename="$(find g_arm_description)/urdf/robot_electromagnet.urdf" />
@@ -9,6 +10,6 @@
     <xacro:include filename="$(find g_arm_moveit2)/config/g_arm.ros2_control.xacro" />
 
     <!-- Include ros2_control configuration -->
-    <xacro:g_arm_ros2_control name="GArmTopicSystem" initial_positions_file="$(find g_arm_moveit2)/config/$(arg initial_positions_file)"/>
+    <xacro:g_arm_ros2_control name="GArmTopicSystem" initial_positions_file="$(find g_arm_moveit2)/config/$(arg initial_positions_file)" hardware_plugin="$(arg ros2_control_hardware_type)"/>
 
 </robot>

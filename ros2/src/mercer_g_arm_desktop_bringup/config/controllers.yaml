@@ -1,0 +1,32 @@
+# ros2_control controller config for g_arm (desktop bringup)
+controller_manager:
+  ros__parameters:
+    update_rate: 50  # Hz
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    magnet_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+arm_controller:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+
+magnet_controller:
+  ros__parameters:
+    joints:
+      - jointPWM
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
