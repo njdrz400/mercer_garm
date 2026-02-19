@@ -3,12 +3,13 @@ FROM osrf/ros:jazzy-desktop
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
+# Install system dependencies and rosdep for ROS package deps
 RUN apt-get update && apt-get install -y \
     git \
     openssh-client \
     python3-pip \
     python3-venv \
+    python3-rosdep2 \
     python3-colcon-common-extensions \
     && rm -rf /var/lib/apt/lists/*
 
@@ -16,15 +17,17 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /opt
 RUN --mount=type=ssh git clone https://github.com/njdrz400/mercer_garm.git
 
-# Copy requirements from build context (run from repo root: docker build -f docker/Dockerfile .)
-COPY requirements.txt /opt/mercer_garm/ros2/requirements.txt
-
-# Create Python venv and install requirements
+# Install ROS dependencies via rosdep (apt)
 WORKDIR /opt/mercer_garm/ros2
+RUN rosdep update && \
+    rosdep install --from-paths src --ignore-src -y
+
+# Copy and install PyPI-only requirements (run from repo root: docker build -f docker/Dockerfile .)
+COPY docker/requirements-pip.txt /opt/mercer_garm/ros2/requirements-pip.txt
 RUN python3 -m venv /opt/venv && \
     . /opt/venv/bin/activate && \
     pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements-pip.txt
 
 ENV PATH="/opt/venv/bin:$PATH"
 

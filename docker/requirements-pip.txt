@@ -1,0 +1,11 @@
+# PyPI-only packages (ROS packages are installed via rosdep/apt)
+numpy>=1.20,<3
+PyYAML>=6.0
+lark>=1.0
+empy>=3.3
+setuptools
+docutils
+pyparsing>=3.0
+packaging
+six
+python-dateutil
