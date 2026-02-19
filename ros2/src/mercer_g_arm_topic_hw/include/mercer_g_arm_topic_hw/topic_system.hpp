@@ -59,15 +59,19 @@ private:
   // Data buffers
   std::vector<double> cmd_pos_;
   std::vector<double> state_pos_;
+  std::vector<double> state_vel_;
 
   // Feedback bookkeeping
   std::mutex fb_mutex_;
   std::vector<double> fb_latest_pos_;
+  std::vector<double> fb_latest_vel_;
   std::atomic<bool> fb_received_{false};
 
   // Throttle command publishing
   std::vector<double> last_sent_cmd_;
   double epsilon_{1e-6};
+
+  bool has_velocity_state_{false};
 };
 
 }  // namespace g_arm_topic_hw

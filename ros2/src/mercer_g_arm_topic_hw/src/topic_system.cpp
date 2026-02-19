@@ -43,6 +43,17 @@ hardware_interface::CallbackReturn TopicSystem::on_init(const hardware_interface
     }
   }
 
+  has_velocity_state_ = false;
+  for (const auto & j : info_.joints) {
+    for (const auto & si : j.state_interfaces) {
+      if (si.name == hardware_interface::HW_IF_VELOCITY) {
+        has_velocity_state_ = true;
+        break;
+      }
+    }
+    if (has_velocity_state_) break;
+  }
+
   // Optional params from URDF <param ...>
   auto it_cmd = info_.hardware_parameters.find("command_topic");
   if (it_cmd != info_.hardware_parameters.end()) {
@@ -60,7 +71,9 @@ hardware_interface::CallbackReturn TopicSystem::on_init(const hardware_interface
   const auto n = joint_names_.size();
   cmd_pos_.assign(n, 0.0);
   state_pos_.assign(n, 0.0);
+  state_vel_.assign(n, 0.0);
   fb_latest_pos_.assign(n, 0.0);
+  fb_latest_vel_.assign(n, 0.0);
   last_sent_cmd_.assign(n, std::numeric_limits<double>::quiet_NaN());
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -69,10 +82,11 @@ hardware_interface::CallbackReturn TopicSystem::on_init(const hardware_interface
 std::vector<hardware_interface::StateInterface> TopicSystem::export_state_interfaces()
 {
   std::vector<hardware_interface::StateInterface> out;
-  out.reserve(joint_names_.size());
-
-  for (size_t i = 0; i < joint_names_.size(); ++i) {
-    out.emplace_back(joint_names_[i], hardware_interface::HW_IF_POSITION, &state_pos_[i]);
+  for (size_t i = 0; i < info_.joints.size(); ++i) {
+    out.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &state_pos_[i]);
+    if (has_velocity_state_) {
+      out.emplace_back(info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &state_vel_[i]);
+    }
   }
   return out;
 }
@@ -147,18 +161,26 @@ void TopicSystem::feedback_cb(const sensor_msgs::msg::JointState::SharedPtr msg)
 {
   if (!msg) return;
 
-  // Map incoming msg.name -> indices in our joint order
-  std::unordered_map<std::string, double> map;
-  map.reserve(msg->name.size());
-  for (size_t i = 0; i < msg->name.size() && i < msg->position.size(); ++i) {
-    map[msg->name[i]] = msg->position[i];
+  std::unordered_map<std::string, double> pos_map;
+  std::unordered_map<std::string, double> vel_map;
+  for (size_t i = 0; i < msg->name.size(); ++i) {
+    if (i < msg->position.size()) {
+      pos_map[msg->name[i]] = msg->position[i];
+    }
+    if (has_velocity_state_ && i < msg->velocity.size()) {
+      vel_map[msg->name[i]] = msg->velocity[i];
+    }
   }
 
   std::lock_guard<std::mutex> lk(fb_mutex_);
   for (size_t i = 0; i < joint_names_.size(); ++i) {
-    auto it = map.find(joint_names_[i]);
-    if (it != map.end()) {
+    auto it = pos_map.find(joint_names_[i]);
+    if (it != pos_map.end()) {
       fb_latest_pos_[i] = it->second;
+    }
+    if (has_velocity_state_) {
+      auto vit = vel_map.find(joint_names_[i]);
+      fb_latest_vel_[i] = (vit != vel_map.end()) ? vit->second : 0.0;
     }
   }
   fb_received_.store(true);
@@ -166,13 +188,17 @@ void TopicSystem::feedback_cb(const sensor_msgs::msg::JointState::SharedPtr msg)
 
 hardware_interface::return_type TopicSystem::read(const rclcpp::Time &, const rclcpp::Duration &)
 {
-  // Copy latest feedback into state buffers
   if (fb_received_.load()) {
     std::lock_guard<std::mutex> lk(fb_mutex_);
     state_pos_ = fb_latest_pos_;
+    if (has_velocity_state_) {
+      state_vel_ = fb_latest_vel_;
+    }
   } else {
-    // Open-loop fallback: state follows command
     state_pos_ = cmd_pos_;
+    if (has_velocity_state_) {
+      std::fill(state_vel_.begin(), state_vel_.end(), 0.0);
+    }
   }
   return hardware_interface::return_type::OK;
 }

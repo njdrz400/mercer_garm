@@ -18,8 +18,8 @@ from glob import glob
 from launch.actions import TimerAction
 
 
-from launch.actions import DeclareLaunchArgument, RegisterEventHandler, TimerAction, ExecuteProcess
-from launch.event_handlers import OnProcessStart, OnProcessExit
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler, TimerAction, GroupAction
+from launch.event_handlers import OnProcessStart
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch.substitutions import PythonExpression
 from launch_ros.actions import Node
@@ -44,23 +44,12 @@ def generate_launch_description():
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
     
-    garm_node = Node(
-        package="mercer_g_arm",
-        executable="driver",
-        name="g_arm_driver",
-        output="screen",
-        parameters=[
-            {"X_ZERO_REAL_ANGLE_DEFAULT": 115.0}
-        ],
-        condition=UnlessCondition(LaunchConfiguration("use_mock_hardware")),
-    )
-    
-    
     
     # When use_mock_hardware is true, use mock_components so no real driver is needed
     ros2_control_hardware_type = PythonExpression([
         "'mock_components/GenericSystem' if '", LaunchConfiguration("use_mock_hardware"), "' == 'true' else 'mercer_g_arm_topic_hw/TopicSystem'"
     ])
+
     moveit_config = (
         MoveItConfigsBuilder("g_arm", package_name="g_arm_moveit2")
         .robot_description(
@@ -73,9 +62,6 @@ def generate_launch_description():
         .to_moveit_configs()
     )
   
-   
-
-
     # Publish TF
     robot_state_publisher_node= Node(
         package="robot_state_publisher",
@@ -105,122 +91,127 @@ def generate_launch_description():
         arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "base_link"],
     )
 
+  
 
-   
-
-    ros2_control_node = Node(
+    # Real hardware: controller config without joint_state_broadcaster (driver publishes /joint_states)
+    ros2_control_node_real = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[PathJoinSubstitution([FindPackageShare('mercer_g_arm_desktop_bringup'), 'config', 'controllers.yaml'])],
+        parameters=[PathJoinSubstitution([FindPackageShare('g_arm_moveit2'), 'config', 'ros2_controllers.yaml'])],
+        remappings=[("~/robot_description", "/robot_description")],
+        arguments=['--ros-args', '--log-level', 'info'],
+        output="screen",
+    )
+    # Mock hardware: controller config with joint_state_broadcaster (for /joint_states + TF)
+    ros2_control_node_mock = Node(
+        package="controller_manager",
+        executable="ros2_control_node",
+        parameters=[PathJoinSubstitution([FindPackageShare('g_arm_moveit2'), 'config', 'ros2_controllers_mock.yaml'])],
         remappings=[("~/robot_description", "/robot_description")],
         arguments=['--ros-args', '--log-level', 'info'],
         output="screen",
     )
 
-    # Start ros2_control_node after g_arm node starts
-    start_ros2_control = RegisterEventHandler(
-        OnProcessStart(
-            target_action=static_tf_node,
-            on_start=[
-                TimerAction(
-                    period=5.0,
-                    actions=[ros2_control_node]),
-            ],
-        )
+    delayed_ros2_control_real = GroupAction(
+        condition=UnlessCondition(LaunchConfiguration("use_mock_hardware")),
+        actions=[TimerAction(period=5.0, actions=[ros2_control_node_real])],
     )
-   
-
-    # Joint state broadcaster spawner (required for MoveIt)
-#    joint_state_broadcaster_spawner = ExecuteProcess(
-#        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active', 'joint_state_broadcaster', '--controller-manager', '/controller_manager'],
-#        output='screen',
-#    )
-
-    # Arm controller spawner  
-#    /controller_manager/list_controllers
-
-    arm_controller_spawner = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active', 'arm_controller', '--controller-manager', '/controller_manager'],
-        output='screen',
+    delayed_ros2_control_mock = GroupAction(
+        condition=IfCondition(LaunchConfiguration("use_mock_hardware")),
+        actions=[TimerAction(period=5.0, actions=[ros2_control_node_mock])],
     )
 
-    # Magnet controller spawner (optional)
-    magnet_controller_spawner = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active', 'magnet_controller', '--controller-manager', '/controller_manager'],
-        output='screen',
+    # Controller spawners (Node-based)
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster", "-c", "/controller_manager", "--activate"],
+        output="screen",
     )
 
-    # Start joint_state_broadcaster first after ros2_control_node starts
-#    start_joint_state_broadcaster = RegisterEventHandler(
-#        OnProcessStart(
-#            target_action=ros2_control_node,
-#            on_start=[
-#                TimerAction(
-#                    period=10.0,
-#                    actions=[joint_state_broadcaster_spawner]
-#                ),
-#            ],
-#        )
-#    )
-
-    # Start arm_controller after joint_state_broadcaster completes
-    start_arm_controller = RegisterEventHandler(
-        OnProcessStart(
-            target_action=ros2_control_node, #joint_state_broadcaster_spawner,
-            on_start=[
-                TimerAction(
-                    period=2.0,
-                    actions=[arm_controller_spawner]
-                ),
-            ],
-        )
+    arm_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["arm_controller", "-c", "/controller_manager", "--activate"],
+        output="screen",
     )
 
-    # Start magnet_controller after arm_controller completes
+    magnet_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["magnet_controller", "-c", "/controller_manager", "--activate"],
+        output="screen",
+    )
+
+    # Mock hardware: spawn joint_state_broadcaster at 7s (for /joint_states + TF), then arm at 9s
+    delayed_joint_state_broadcaster_mock = TimerAction(
+        period=7.0,
+        actions=[joint_state_broadcaster_spawner],
+    )
+    delayed_arm_controller_mock = TimerAction(
+        period=9.0,
+        actions=[arm_controller_spawner],
+    )
+    mock_controller_sequence = GroupAction(
+        condition=IfCondition(LaunchConfiguration("use_mock_hardware")),
+        actions=[delayed_joint_state_broadcaster_mock, delayed_arm_controller_mock],
+    )
+    # Real hardware: spawn arm_controller at 7s only
+    delayed_arm_controller_real = TimerAction(
+        period=7.0,
+        actions=[arm_controller_spawner],
+    )
+    real_controller_sequence = GroupAction(
+        condition=UnlessCondition(LaunchConfiguration("use_mock_hardware")),
+        actions=[delayed_arm_controller_real],
+    )
+
     start_magnet_controller = RegisterEventHandler(
-        OnProcessExit(
+        OnProcessStart(
             target_action=arm_controller_spawner,
-            on_exit=[
-                TimerAction(
-                    period=2.0,
-                    actions=[magnet_controller_spawner]
-                ),
+            on_start=[
+                TimerAction(period=2.0, actions=[magnet_controller_spawner]),
             ],
         )
     )
 
-    # Go-to-pose action server (move_group + go_to_pose_server), started after controllers are up
+    # Go-to-pose action server, started 3s after magnet_controller spawner starts
     go_to_pose_server_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             os.path.join(get_package_share_directory('mercer_robot_commander_cpp'), 'launch', 'go_to_pose_server.launch.py')
         ])
     )
     start_go_to_pose_server = RegisterEventHandler(
-        OnProcessExit(
+        OnProcessStart(
             target_action=magnet_controller_spawner,
-            on_exit=[
-                TimerAction(
-                    period=3.0,
-                    actions=[go_to_pose_server_launch]
-                ),
+            on_start=[
+                TimerAction(period=3.0, actions=[go_to_pose_server_launch]),
             ],
         )
     )
 
+    # Real hardware driver: only start when not using mock
+    garm_node = Node(
+        package="mercer_g_arm",
+        executable="driver",
+        name="g_arm_driver",
+        output="screen",
+        parameters=[
+            {"X_ZERO_REAL_ANGLE_DEFAULT": 115.0}
+        ],
+        condition=UnlessCondition(LaunchConfiguration("use_mock_hardware")),
+    )
+    
     return LaunchDescription([
-#        robot_description,
-   
- #       delayed_start,
         use_mock_hardware_arg,
         model_arg,
         garm_node,
-        #joint_state_publisher_node,
         robot_state_publisher_node,
         static_tf_node,
-        #gpio_init
-        start_ros2_control,
- #       start_joint_state_broadcaster,
-        start_arm_controller,
+        delayed_ros2_control_real,
+        delayed_ros2_control_mock,
+        mock_controller_sequence,
+        real_controller_sequence,
         start_magnet_controller,
         start_go_to_pose_server,
     ])

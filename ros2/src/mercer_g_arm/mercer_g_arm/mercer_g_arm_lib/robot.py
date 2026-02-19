@@ -14,7 +14,7 @@ class Robot:
     def __init__(self):      
         self.__grbl = grblAPI.Grbl()
     
-    def start(self, port='/dev/ttyUSB0'):
+    def start(self, port='/dev/ttyUSB2'):
         
         if not self.__grbl.start(port):
             return False
