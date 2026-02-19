@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /opt
 RUN --mount=type=ssh git clone https://github.com/njdrz400/mercer_garm.git
 
+# Copy requirements from build context (run from repo root: docker build -f docker/Dockerfile .)
+COPY requirements.txt /opt/mercer_garm/ros2/requirements.txt
+
 # Create Python venv and install requirements
 WORKDIR /opt/mercer_garm/ros2
 RUN python3 -m venv /opt/venv && \
