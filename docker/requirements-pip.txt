@@ -1,4 +1,6 @@
 # PyPI-only packages (ROS packages are installed via rosdep/apt)
+# catkin_pkg needed so ament_cmake finds it when colcon build uses venv Python
+catkin_pkg
 numpy>=1.20,<3
 PyYAML>=6.0
 lark>=1.0

@@ -22,10 +22,13 @@ WORKDIR /opt
 RUN --mount=type=ssh git clone https://github.com/njdrz400/mercer_garm.git
 
 # Install ROS dependencies via rosdep (apt)
+# apt-get update needed here because earlier layer cleared apt lists
 # Skip keys that may be missing in rosdistro (e.g. custom or from other repos)
 WORKDIR /opt/mercer_garm/ros2
-RUN rosdep update && \
-    rosdep install --from-paths src --ignore-src -y --skip-keys "moveit_configs_utils warehouse_ros_mongo"
+RUN apt-get update && \
+    rosdep update && \
+    rosdep install --from-paths src --ignore-src -y --skip-keys "moveit_configs_utils warehouse_ros_mongo gazebo_plugins gazebo_ros_pkgs gazebo_ros moveit::ros_planning_interface ament_python rviz" && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy and install PyPI-only requirements (run from repo root: docker build -f docker/Dockerfile .)
 COPY requirements-pip.txt /opt/mercer_garm/ros2/requirements-pip.txt
@@ -36,8 +39,8 @@ RUN python3 -m venv /opt/venv && \
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Build ROS2 workspace
-RUN . /opt/ros/jazzy/setup.sh && colcon build
+# Build ROS2 workspace (use system Python so ament finds catkin_pkg from apt)
+RUN . /opt/ros/jazzy/setup.sh && PATH="/usr/bin:$PATH" colcon build
 
 # Auto-source on container start
 RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc && \
