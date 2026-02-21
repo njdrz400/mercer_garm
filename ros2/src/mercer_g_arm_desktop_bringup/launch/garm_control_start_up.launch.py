@@ -220,23 +220,7 @@ def generate_launch_description():
     default_rviz_config = os.path.join(
         get_package_share_directory('g_arm_moveit2'), 'launch', 'moveit.rviz'
     )
-    rviz_node = Node(
-        package='rviz2',
-        executable='rviz2',
-        name='rviz2',
-        output='screen',
-        arguments=['-d', default_rviz_config],
-        condition=IfCondition(LaunchConfiguration('use_rviz')),
-    )
-
-    # RQt (optional)
-    rqt_node = Node(
-        package='rqt_gui',
-        executable='rqt_gui',
-        name='rqt',
-        output='screen',
-        condition=IfCondition(LaunchConfiguration('use_rqt')),
-    )
+    
     
     return LaunchDescription([
         use_mock_hardware_arg,
@@ -252,8 +236,7 @@ def generate_launch_description():
         real_controller_sequence,
         start_magnet_controller,
         start_go_to_pose_server,
-        rviz_node,
-        rqt_node,
+       
     ])
 
 

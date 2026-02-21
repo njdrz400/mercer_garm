@@ -39,6 +39,7 @@ setup(
     entry_points={
         'console_scripts': [
             'add_world_to_planning_scene = mercer_g_arm_sim.add_world_to_planning_scene:main',
+            'add_grid_to_planning_scene = mercer_g_arm_sim.add_grid_to_planning_scene:main',
         ],
     },
 )

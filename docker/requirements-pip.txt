@@ -11,3 +11,4 @@ pyparsing>=3.0
 packaging
 six
 python-dateutil
+PySide2

@@ -35,6 +35,15 @@ def generate_launch_description():
         name='mercer_g_arm_sim_add_world_to_planning_scene',
         output='screen'
     )
+
+    # Add 300 mm x 300 mm grid (50 mm spacing, 5 mm thick) as collision objects
+    # so the robot can plan around the grid
+    add_grid_to_scene = Node(
+        package='mercer_g_arm_sim',
+        executable='add_grid_to_planning_scene',
+        name='add_grid_to_planning_scene',
+        output='screen'
+    )
     
     # Note: With ros2_control properly configured, joint states should be published
     # automatically through the controller manager. However, we may need a bridge
@@ -73,6 +82,11 @@ def generate_launch_description():
         TimerAction(
             period=2.0,  # Wait for MoveIt2 to fully initialize
             actions=[add_world_to_scene]
+        ),
+        # Add grid collision object after world
+        TimerAction(
+            period=3.0,
+            actions=[add_grid_to_scene]
         ),
     ])
 
