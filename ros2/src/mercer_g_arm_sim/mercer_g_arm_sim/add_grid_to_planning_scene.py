@@ -58,14 +58,14 @@ class GridToPlanningScene(Node):
         # Color for those squares as [r, g, b, a] in 0–1 (default black)
         self.declare_parameter('square_color', [0.0, 0.0, 0.0, 1.0])
 
-        self.size_x = self.get_parameter('size_x').value
-        self.size_y = self.get_parameter('size_y').value
-        self.spacing = self.get_parameter('spacing').value
-        self.thickness = self.get_parameter('thickness').value
+        self.size_x = float(self.get_parameter('size_x').value)
+        self.size_y = float(self.get_parameter('size_y').value)
+        self.spacing = float(self.get_parameter('spacing').value)
+        self.thickness = float(self.get_parameter('thickness').value)
         self.frame_id = self.get_parameter('frame_id').value
-        self.center_x = self.get_parameter('center_x').value
-        self.center_y = self.get_parameter('center_y').value
-        self.center_z = self.get_parameter('center_z').value
+        self.center_x = float(self.get_parameter('center_x').value)
+        self.center_y = float(self.get_parameter('center_y').value)
+        self.center_z = float(self.get_parameter('center_z').value)
 
         self.scene_publisher = self.create_publisher(
             PlanningScene, '/planning_scene', 10
@@ -76,6 +76,9 @@ class GridToPlanningScene(Node):
 
         self.clear_planning_scene()
         self.add_grid_objects()
+
+        # Update planning scene once per second
+        self.timer = self.create_timer(1.0, self.add_grid_objects)
 
     def clear_planning_scene(self):
         """Clear the planning scene (remove previous collision objects) before adding new ones."""
@@ -182,11 +185,13 @@ class GridToPlanningScene(Node):
         self.add_squares_on_grid(scene, square_centers, color=square_color)
 
         self.scene_publisher.publish(scene)
-        self.get_logger().info(
-            f'Published grid to planning scene: {num_h} horizontal + {num_v} vertical '
-            f'lines ({self.size_x*1000:.0f}x{self.size_y*1000:.0f} mm, '
-            f'spacing {self.spacing*1000:.0f} mm, thickness {self.thickness*1000:.0f} mm)'
-        )
+        if not hasattr(self, '_publish_count'):
+            self._publish_count = 0
+        self._publish_count += 1
+        if self._publish_count == 1 or self._publish_count % 10 == 0:
+            self.get_logger().info(
+                f'Published grid to planning scene ({self._publish_count}): {num_h}h + {num_v}v lines'
+            )
 
     def _get_black_square_centers_param(self):
         """Read black_square_centers from parameter (list of [x,y] or [x,y,z] in meters)."""
@@ -265,16 +270,23 @@ class GridToPlanningScene(Node):
                 scene.world.collision_objects.append(obj)
                 scene.object_colors.append(ObjectColor(id=obj.id, color=color))
 
-        self.get_logger().info(
-            f'Added {len(center_points)} square(s) on grid (4 lines, 5 mm thick, not solid)'
-        )
+        if not getattr(self, '_squares_logged', False):
+            self._squares_logged = True
+            self.get_logger().info(
+                f'Added {len(center_points)} square(s) on grid (4 lines, 5 mm thick, not solid)'
+            )
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = GridToPlanningScene()
-    time.sleep(1.0)
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':

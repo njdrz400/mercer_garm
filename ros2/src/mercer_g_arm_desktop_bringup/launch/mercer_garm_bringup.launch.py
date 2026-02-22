@@ -63,8 +63,19 @@ def generate_launch_description():
 
     x_zero_real_angle_arg = DeclareLaunchArgument(
         'x_zero_real_angle',
-        default_value='135',
+        default_value='110.0',
         description='Real angle (degrees) when robot joint 1 (X) is at zero in GRBL',
+    )
+
+    grid_center_x_arg = DeclareLaunchArgument(
+        'grid_center_x',
+        default_value='0.25',
+        description='Grid center X (m) for add_grid_to_planning_scene',
+    )
+    grid_center_y_arg = DeclareLaunchArgument(
+        'grid_center_y',
+        default_value='0.0',
+        description='Grid center Y (m) for add_grid_to_planning_scene',
     )
 
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
@@ -101,13 +112,7 @@ def generate_launch_description():
     )
 
 
-    #joint_state_publisher_node = Node(
-    #      package='joint_state_publisher',
-    ##    executable='joint_state_publisher',
-    #    parameters=[{'robot_description': robot_description}],
-    #    output="screen"     
-    #)
-
+  
     # Static TF
     static_tf_node = Node(
         package="tf2_ros",
@@ -229,18 +234,61 @@ def generate_launch_description():
         condition=UnlessCondition(LaunchConfiguration("use_mock_hardware")),
     )
 
-    # RViz2 (optional)
-    default_rviz_config = os.path.join(
-        get_package_share_directory('g_arm_moveit2'), 'launch', 'moveit.rviz'
+    # RViz2 (optional), using sim.rviz from this package
+    sim_rviz_config = os.path.join(
+        get_package_share_directory('mercer_g_arm_desktop_bringup'), 'config', 'sim.rviz'
     )
-    
-    
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='screen',
+        arguments=['-d', sim_rviz_config],
+        condition=IfCondition(LaunchConfiguration('use_rviz')),
+    )
+
+    # RQt (optional)
+    rqt_node = Node(
+        package='rqt_gui',
+        executable='rqt_gui',
+        name='rqt',
+        output='screen',
+        condition=IfCondition(LaunchConfiguration('use_rqt')),
+    )
+
+    # Grid planning-scene node (add_grid_to_planning_scene): run after RViz so planning scene display is ready
+    add_grid_node = Node(
+        package='mercer_g_arm_sim',
+        executable='add_grid_to_planning_scene',
+        name='add_grid_to_planning_scene',
+        output='screen',
+        parameters=[
+            {'center_x': LaunchConfiguration('grid_center_x')},
+            {'center_y': LaunchConfiguration('grid_center_y')},
+        ],
+    )
+    # When RViz is used: start add_grid 4s after RViz starts (RViz before planning scene)
+    # (When use_rviz is false, rviz_node is not launched so this event never fires.)
+    start_add_grid_after_rviz = RegisterEventHandler(
+        OnProcessStart(
+            target_action=rviz_node,
+            on_start=[TimerAction(period=1.0, actions=[add_grid_node])],
+        ),
+    )
+    # When RViz is disabled: start add_grid after 10s (planning scene still needs to be up)
+    delayed_add_grid_no_rviz = GroupAction(
+        condition=UnlessCondition(LaunchConfiguration('use_rviz')),
+        actions=[TimerAction(period=1.0, actions=[add_grid_node])],
+    )
+
     return LaunchDescription([
         use_mock_hardware_arg,
         use_rviz_arg,
         use_rqt_arg,
         usb_port_arg,
         x_zero_real_angle_arg,
+        grid_center_x_arg,
+        grid_center_y_arg,
         model_arg,
         garm_node,
         robot_state_publisher_node,
@@ -251,8 +299,8 @@ def generate_launch_description():
         real_controller_sequence,
         start_magnet_controller,
         start_go_to_pose_server,
-       
+        rviz_node,
+        rqt_node,
+        start_add_grid_after_rviz,
+        delayed_add_grid_no_rviz,
     ])
-
-
-

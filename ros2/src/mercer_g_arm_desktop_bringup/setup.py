@@ -15,9 +15,9 @@ setup(
         # Install launch files
         (os.path.join('share', package_name, 'launch'),
             glob('launch/*.launch.py')),
-        # Install config
+        # Install config (YAML and RViz)
         (os.path.join('share', package_name, 'config'),
-            glob('config/*.yaml')),
+            glob('config/*.yaml') + glob('config/*.rviz')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
