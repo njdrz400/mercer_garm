@@ -5,16 +5,18 @@ RELATION_X_DEG = 1 # Relation between x in grbl and degrees
 RELATION_Y_DEG = 1 # Relation between x in grbl and degrees
 RELATION_Z_DEG = 1 # Relation between x in grbl and degrees
 
-X_ZERO_REAL_ANGLE = 135 # Real angle when robot is zero X
-Y_ZERO_REAL_ANGLE = 15 # Real angle when robot is zero Y
-Z_ZERO_REAL_ANGLE = -36 # Real angle when robot is zero Z
+X_ZERO_REAL_ANGLE_DEFAULT = 135  # Real angle when robot is zero X
+Y_ZERO_REAL_ANGLE = 15  # Real angle when robot is zero Y
+Z_ZERO_REAL_ANGLE = -36  # Real angle when robot is zero Z
+
 
 class Robot:
     
-    def __init__(self):      
+    def __init__(self, x_zero_real_angle=None):
         self.__grbl = grblAPI.Grbl()
+        self.__x_zero_real_angle = float(x_zero_real_angle) if x_zero_real_angle is not None else X_ZERO_REAL_ANGLE_DEFAULT
     
-    def start(self, port='/dev/ttyUSB2'):
+    def start(self, port='/dev/ttyUSB0'):
         
         if not self.__grbl.start(port):
             return False
@@ -40,7 +42,7 @@ class Robot:
             XGrbl, YGrbl, ZGrbl = self.__grbl.getXYZ()
             X0, Y0, Z0 = self.zeroGrblPosition   
             
-            X = ((XGrbl-X0) * RELATION_X_DEG) + X_ZERO_REAL_ANGLE
+            X = ((XGrbl-X0) * RELATION_X_DEG) + self.__x_zero_real_angle
             Y = ((YGrbl-Y0) * RELATION_Y_DEG) + Y_ZERO_REAL_ANGLE
             Z = ((ZGrbl-Z0) * RELATION_Z_DEG) + Z_ZERO_REAL_ANGLE
             
@@ -52,7 +54,7 @@ class Robot:
         
         X0, Y0, Z0 = self.zeroGrblPosition 
         
-        XGrbl = ((j1 - X_ZERO_REAL_ANGLE) / RELATION_X_DEG) + X0
+        XGrbl = ((j1 - self.__x_zero_real_angle) / RELATION_X_DEG) + X0
         YGrbl = ((j2 - Y_ZERO_REAL_ANGLE) / RELATION_Y_DEG) + Y0
         ZGrbl = ((j3 - Z_ZERO_REAL_ANGLE) / RELATION_Z_DEG) + Z0
         

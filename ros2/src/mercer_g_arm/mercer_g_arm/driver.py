@@ -13,15 +13,22 @@ class Driver(Node):
     
     def __init__(self):
         super().__init__('g_arm_driver')
-        
+        self.declare_parameter('usb_port', '/dev/ttyUSB0')
+        self.declare_parameter('X_ZERO_REAL_ANGLE', 135)
+        usb_port = self.get_parameter('usb_port').value
+        x_zero_real_angle = float(self.get_parameter('X_ZERO_REAL_ANGLE').value)
+
         self.subscription = self.create_subscription(JointState, 'joint_commands', self.joints_state_callback, 10)
         
-        self.robot = robot.Robot()
+        self.robot = robot.Robot(x_zero_real_angle=x_zero_real_angle)
         
         self.get_logger().info("Connecting and calibrating the robot (May take a while)")
         
-        if not self.robot.start():
-            self.get_logger().error("Unable to start communications in /dev/ttyUSB0. Do you have permissions? (Try: sudo chmod 777 /dev/ttyUSB0)")
+        if not self.robot.start(port=usb_port):
+            self.get_logger().error(
+                f"Unable to start communications on {usb_port}. "
+                f"Do you have permissions? (Try: sudo chmod 666 {usb_port})"
+            )
             exit(1)
             
         self.get_logger().info(colored("Robot is ready to move!", "green"))

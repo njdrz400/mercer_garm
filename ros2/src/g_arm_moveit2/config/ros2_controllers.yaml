@@ -10,6 +10,9 @@ controller_manager:
     tool_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    magnet_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
 arm_controller:
   ros__parameters:
     joints:
@@ -23,6 +26,16 @@ arm_controller:
       - velocity
 
 tool_controller:
+  ros__parameters:
+    joints:
+      - jointPWM
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+
+magnet_controller:
   ros__parameters:
     joints:
       - jointPWM

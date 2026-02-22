@@ -55,6 +55,18 @@ def generate_launch_description():
         description='Flag to enable RQt',
     )
 
+    usb_port_arg = DeclareLaunchArgument(
+        'usb_port',
+        default_value='/dev/ttyUSB0',
+        description='USB port for the robot (e.g. /dev/ttyUSB0 or /dev/ttyACM0)',
+    )
+
+    x_zero_real_angle_arg = DeclareLaunchArgument(
+        'x_zero_real_angle',
+        default_value='135',
+        description='Real angle (degrees) when robot joint 1 (X) is at zero in GRBL',
+    )
+
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
                                        value_type=str)
     
@@ -211,7 +223,8 @@ def generate_launch_description():
         name="g_arm_driver",
         output="screen",
         parameters=[
-            {"X_ZERO_REAL_ANGLE_DEFAULT": 115.0}
+            {"usb_port": LaunchConfiguration("usb_port")},
+            {"X_ZERO_REAL_ANGLE": LaunchConfiguration("x_zero_real_angle")},
         ],
         condition=UnlessCondition(LaunchConfiguration("use_mock_hardware")),
     )
@@ -226,6 +239,8 @@ def generate_launch_description():
         use_mock_hardware_arg,
         use_rviz_arg,
         use_rqt_arg,
+        usb_port_arg,
+        x_zero_real_angle_arg,
         model_arg,
         garm_node,
         robot_state_publisher_node,
