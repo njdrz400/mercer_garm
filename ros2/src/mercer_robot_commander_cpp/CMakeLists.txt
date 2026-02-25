@@ -113,9 +113,13 @@ install(DIRECTORY launch
 )
 
 # Install Python scripts to lib/${PROJECT_NAME}; PROGRAMS sets executable bit so launch finds them.
-set(SCRIPTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/scripts)
-file(GLOB _scripts "${SCRIPTS_DIR}/*.py")
-install(PROGRAMS ${_scripts}
+# (Paths relative to CMAKE_CURRENT_SOURCE_DIR so they are found at configure and install time.)
+install(PROGRAMS
+  scripts/pose_list_commander_node.py
+  scripts/pose_list_commander_interface.py
+  scripts/go_to_pose_client.py
+  scripts/example_go_to_pose.py
+  scripts/g_arm_jog_gui.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

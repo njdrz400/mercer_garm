@@ -52,6 +52,15 @@ GUI (RViz) works with WSLg. From repo root:
 
 docker run -it --rm   -v "$(pwd)/mercer_garm/ros2:/ros2_ws/src" -v /tmp/.X11-unix:/tmp/.X11-unix  -e DISPLAY="$DISPLAY"   -e QT_X11_NO_MITSHM=1   mercer_garm:jazzy   bash
 
+docker run -dit \
+  --name mercer_garm_dev \
+  --net=host \
+  --privileged \
+  -v ~/mercer_garm/ros2:/ros2_ws \
+  -v /tmp/.X11-unix:/tmp/.X11-unix \
+  -e DISPLAY="$DISPLAY" \
+  -e QT_X11_NO_MITSHM=1 \
+  mercer_garm:jazzy
 Then inside the container:
 
 ```bash
