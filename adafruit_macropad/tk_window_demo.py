@@ -33,8 +33,9 @@ class SerialWindow:
         self.read_queue = queue.Queue()
         self.reading = False
         self._after_id = None
-        self.current_turn = None  # "red" or "blue" when game mode active
-        self._read_buffer = ""  # incomplete serial input until newline
+        self.current_turn = None  # "rtrn" or "btrn" when game mode active
+        self.board = [None] * 9   # None or "red" or "blue" per cell 0..8
+        self._read_buffer = ""   # incomplete serial input until newline
 
         self._build_ui()
 
@@ -58,7 +59,7 @@ class SerialWindow:
                 self.port_combo.set("/dev/ttyUSB0" if __import__("sys").platform != "win32" else "COM1")
 
         ttk.Label(top, text="Baud:").pack(side=tk.LEFT, padx=(12, 4))
-        self.baud_var = tk.StringVar(value="9600")
+        self.baud_var = tk.StringVar(value="115200")
         baud_combo = ttk.Combobox(
             top, textvariable=self.baud_var, width=8, state="readonly"
         )
@@ -68,35 +69,37 @@ class SerialWindow:
         self.connect_btn = ttk.Button(top, text="Connect", command=self._toggle_connect)
         self.connect_btn.pack(side=tk.LEFT, padx=(12, 0))
 
-        # Red / Blue command buttons (set_red_0 .. set_red_8, set_blue_0 .. set_blue_8)
+        # Red / Blue command buttons (position selection; disabled in game mode — use macropad only)
         btn_frame = ttk.LabelFrame(self.root, text="Commands", padding=4)
         btn_frame.pack(fill=tk.X, padx=6, pady=4)
         red_frame = ttk.Frame(btn_frame)
         red_frame.pack(fill=tk.X)
         ttk.Label(red_frame, text="Red:").grid(row=0, column=0, padx=(0, 6), sticky=tk.W)
+        self.red_buttons = []
         for i in range(9):
-            cmd = f"set_red_{i}"
-            ttk.Button(red_frame, text=f"red_{i}", command=lambda c=cmd: self._send_command(c)).grid(
-                row=0, column=i + 1, padx=2
-            )
+            cmd = f"sr0{i}"
+            b = ttk.Button(red_frame, text=f"red_{i}", command=lambda c=cmd: self._send_command(c))
+            b.grid(row=0, column=i + 1, padx=2)
+            self.red_buttons.append(b)
         blue_frame = ttk.Frame(btn_frame)
         blue_frame.pack(fill=tk.X, pady=(4, 0))
         ttk.Label(blue_frame, text="Blue:").grid(row=0, column=0, padx=(0, 6), sticky=tk.W)
+        self.blue_buttons = []
         for i in range(9):
-            cmd = f"set_blue_{i}"
-            ttk.Button(blue_frame, text=f"blue_{i}", command=lambda c=cmd: self._send_command(c)).grid(
-                row=0, column=i + 1, padx=2
-            )
+            cmd = f"sb0{i}"
+            b = ttk.Button(blue_frame, text=f"blue_{i}", command=lambda c=cmd: self._send_command(c))
+            b.grid(row=0, column=i + 1, padx=2)
+            self.blue_buttons.append(b)
         turn_frame = ttk.Frame(btn_frame)
         turn_frame.pack(fill=tk.X, pady=(8, 0))
         ttk.Label(turn_frame, text="Turn:").pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(turn_frame, text="Red's turn", command=lambda: self._send_command("red_turn")).pack(
+        ttk.Button(turn_frame, text="Red's turn", command=lambda: self._send_command("rtrn")).pack(
             side=tk.LEFT, padx=4
         )
-        ttk.Button(turn_frame, text="Blue's turn", command=lambda: self._send_command("blue_turn")).pack(
+        ttk.Button(turn_frame, text="Blue's turn", command=lambda: self._send_command("btrn")).pack(
             side=tk.LEFT, padx=4
         )
-        ttk.Button(turn_frame, text="Clear board", command=lambda: self._send_command("clear_board")).pack(
+        ttk.Button(turn_frame, text="Clear board", command=self._on_clear_board).pack(
             side=tk.LEFT, padx=4
         )
         ttk.Button(turn_frame, text="Game mode", command=self._on_game_mode).pack(
@@ -166,7 +169,7 @@ class SerialWindow:
         if not self.reading or self.ser is None or not self.ser.is_open:
             return
         try:
-            data = self.ser.read(self.ser.in_waiting or 1)
+            data = self.ser.read(self.ser.in_waiting or 1)  
             if data:
                 try:
                     text = data.decode("utf-8", errors="replace")
@@ -195,17 +198,15 @@ class SerialWindow:
                 self._read_buffer += text
             except queue.Empty:
                 break
-        # Process complete lines so key_pressed_N is not split across chunks
-        while "\n" in self._read_buffer or "\r" in self._read_buffer:
-            line, sep, rest = self._read_buffer.partition("\n")
-            if not sep:
-                line, sep, rest = self._read_buffer.partition("\r")
-            self._read_buffer = rest.lstrip("\n\r")
-            line = line.strip()
+        # Split by newline: each complete line (followed by \n or \r) is one command
+        parts = self._read_buffer.replace("\r", "\n").split("\n")
+        self._read_buffer = parts.pop()  # last segment may be incomplete, keep in buffer
+        for raw_line in parts:
+            line = raw_line.strip()
             if line:
                 self._append_log("recv:", line)
                 self._handle_received(line)
-        # If no newline but buffer is exactly a known token (device sends without newline)
+        # If buffer is exactly a known token (device sent without newline), process and clear
         token = self._read_buffer.strip()
         if token in self._KEY_TO_CELL:
             self._append_log("recv:", token)
@@ -213,38 +214,58 @@ class SerialWindow:
             self._read_buffer = ""
         self.root.after(100, self._drain_queue)
 
-    # key_pressed_3..11 -> cell index 0..8 for set_red_* / set_blue_*
-    _KEY_TO_CELL = {f"key_pressed_{i}": i - 3 for i in range(3, 12)}
+    # Macropad sends kp03..kp11 for grid keys (key index 3–11 → cell 0–8). Also accept key_pressed_N.
+    _KEY_TO_CELL = {f"kp{i:02d}": i - 3 for i in range(3, 12)}
+    _KEY_TO_CELL.update({f"key_pressed_{i}": i - 3 for i in range(3, 12)})
 
     def _handle_received(self, text):
-        """In game mode: map key_pressed_3..11 to set_red_0..8 or set_blue_0..8; then switch turn."""
-        if self.current_turn not in ("red", "blue") or self.ser is None or not self.ser.is_open:
+        """In game mode: on kp03..kp11 from macropad, set that cell to turn color and send srNN/sbNN."""
+        if self.current_turn not in ("rtrn", "btrn") or self.ser is None or not self.ser.is_open:
             return
+        color = "red" if self.current_turn == "rtrn" else "blue"
         for token in text.split():
             token = token.strip()
             cell = self._KEY_TO_CELL.get(token)
-            if cell is not None:
-                color = self.current_turn
-                self._send_command(f"set_{color}_{cell}")
-                self.current_turn = "blue" if color == "red" else "red"
-                self._send_command(f"{self.current_turn}_turn")
+            if cell is not None and self.board[cell] is None:
+                # Tell macropad to set this button's color to current turn (srNN = red, sbNN = blue)
+                set_color_cmd = ("sr" if color == "red" else "sb") + f"{cell:02d}"
+                self._send_command(set_color_cmd)
+                self.board[cell] = color
+                self.current_turn = "btrn" if color == "red" else "rtrn"
+                self._send_command(self.current_turn)
+
+    def _update_game_mode_ui(self):
+        """In game mode only macropad selects position; disable Red/Blue position buttons."""
+        state = "disabled" if self.current_turn is not None else "normal"
+        for b in self.red_buttons + self.blue_buttons:
+            b.config(state=state)
+
+    def _on_clear_board(self):
+        """Send clrb; exit game mode and re-enable position buttons."""
+        if self.ser is not None and self.ser.is_open:
+            self._send_command("clrb")
+        self.current_turn = None
+        self.board = [None] * 9
+        self._update_game_mode_ui()
 
     def _on_game_mode(self):
-        """Send clear_board, pick random first turn, send red_turn or blue_turn."""
+        """Clear board, pick random first turn; position selection is macropad only."""
         if self.ser is None or not self.ser.is_open:
             messagebox.showinfo("Info", "Connect to a port first.")
             return
-        self._send_command("clear_board")
-        self.current_turn = random.choice(["red", "blue"])
-        self._send_command(f"{self.current_turn}_turn")
+        self.board = [None] * 9
+        self._send_command("clrb")
+        self.current_turn = random.choice(["rtrn", "btrn"])
+        self._send_command(self.current_turn)
+        self._update_game_mode_ui()
 
     def _send_command(self, cmd):
-        """Send a command string over serial (e.g. set_blue_0, set_red_1)."""
+        """Send a command over serial. Macropad expects exactly 4 bytes (no newline)."""
         if self.ser is None or not self.ser.is_open:
             messagebox.showinfo("Info", "Connect to a port first.")
             return
         try:
-            self.ser.write(cmd.encode("utf-8"))
+            self.ser.write(cmd.encode("utf-8")+b"\n")
             self._append_log("sent:", cmd)
         except Exception as e:
             messagebox.showerror("Send error", str(e))
