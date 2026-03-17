@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Python GUI node for jogging the g-arm robot on xyz axis,
-controlling the electromagnet, and controlling LEDs.
+Python GUI node for jogging the g-arm robot on xyz axis
+and controlling the electromagnet.
 """
 
 import rclpy
@@ -17,22 +17,6 @@ from tf2_ros.transform_listener import TransformListener
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
-
-# Try to import GPIO action type, but make it optional for PC deployment
-try:
-    from pi_gpio_interface.action import GPIO
-    GPIO_AVAILABLE = True
-except ImportError:
-    GPIO_AVAILABLE = False
-    # Create a dummy class for type hints when GPIO is not available
-    class GPIO:
-        class Goal:
-            def __init__(self):
-                self.gpio = ""
-        class Result:
-            def __init__(self):
-                self.success = False
-
 
 class GArmJogGUI(Node):
     def __init__(self):
@@ -57,20 +41,6 @@ class GArmJogGUI(Node):
             '/magnet_controller/follow_joint_trajectory'
         )
         
-        # GPIO action client (only if interface is available)
-        self.gpio_action_client = None
-        if GPIO_AVAILABLE:
-            try:
-                self.gpio_action_client = ActionClient(
-                    self,
-                    GPIO,
-                    '/pi_gpio_server'
-                )
-            except Exception as e:
-                self.get_logger().warn(f'Failed to create GPIO action client: {e}')
-        else:
-            self.get_logger().info('GPIO interface not available - LED controls will be disabled')
-        
         # Jog parameters
         self.jog_step = 0.01  # meters per jog command
         self.current_goal_handle = None  # Track current action goal
@@ -82,10 +52,6 @@ class GArmJogGUI(Node):
         
         # Electromagnet state
         self.electromagnet_on = False
-        
-        # LED states (assuming GPIO pins 17, 18, 27 based on gpio_init_node.py)
-        self.led_pins = [17, 18, 27]
-        self.led_states = {pin: False for pin in self.led_pins}
         
         # Flag to track if GUI is ready
         self.gui_ready = False
@@ -248,35 +214,9 @@ class GArmJogGUI(Node):
         ttk.Separator(main_frame, orient=tk.HORIZONTAL).grid(row=23, column=0, columnspan=3, 
                                                              sticky=(tk.W, tk.E), pady=10)
         
-        # LED controls (only if GPIO is available)
-        if GPIO_AVAILABLE and self.gpio_action_client is not None:
-            ttk.Label(main_frame, text="LED Controls", font=("Arial", 12, "bold")).grid(
-                row=24, column=0, columnspan=3, pady=5
-            )
-            
-            self.led_vars = {}
-            for i, pin in enumerate(self.led_pins):
-                led_var = tk.BooleanVar(value=False)
-                self.led_vars[pin] = led_var
-                led_toggle = ttk.Checkbutton(main_frame, text=f"LED {pin}", 
-                                            variable=led_var,
-                                            command=lambda p=pin: self._toggle_led(p))
-                led_toggle.grid(row=25+i, column=0, columnspan=3, pady=2, sticky=tk.W)
-        else:
-            # Show disabled LED section
-            ttk.Label(main_frame, text="LED Controls (Not Available)", 
-                     font=("Arial", 12, "bold"), foreground="gray").grid(
-                row=24, column=0, columnspan=3, pady=5
-            )
-            ttk.Label(main_frame, text="GPIO interface not available on this system", 
-                     foreground="gray").grid(
-                row=25, column=0, columnspan=3, pady=2
-            )
-            self.led_vars = {}
-        
         # Status label
         self.status_label = ttk.Label(main_frame, text="Ready", foreground="green")
-        self.status_label.grid(row=28, column=0, columnspan=3, pady=10)
+        self.status_label.grid(row=24, column=0, columnspan=3, pady=10)
         
         self.root.focus_set()
         
@@ -355,8 +295,8 @@ class GArmJogGUI(Node):
         goal_msg.ang_tolerance_rad = 6.28  # Large tolerance to ignore orientation
         goal_msg.timeout_sec = 5.0
         goal_msg.allow_orientation = True  # Ignore orientation constraints
-        goal_msg.electromagnet_on = False  # Don't change electromagnet during jog
-        
+        goal_msg.electromagnet_on = self.electromagnet_on  # Keep electromagnet state after jog
+
         self.current_pose_lock = True
         self._update_status(f"Moving {axis.upper()}: {'+' if direction > 0 else '-'} {self.step_var.get():.3f}m...", "blue")
         
@@ -448,8 +388,8 @@ class GArmJogGUI(Node):
         goal_msg.ang_tolerance_rad = 6.28  # Large tolerance to ignore orientation
         goal_msg.timeout_sec = 10.0
         goal_msg.allow_orientation = True  # Ignore orientation constraints
-        goal_msg.electromagnet_on = False  # Don't change electromagnet
-        
+        goal_msg.electromagnet_on = self.electromagnet_on  # Keep electromagnet state after home
+
         self.current_pose_lock = True
         self._update_status("Moving to Home position...", "blue")
         
@@ -535,8 +475,8 @@ class GArmJogGUI(Node):
         goal_msg.ang_tolerance_rad = 6.28  # Large tolerance to ignore orientation
         goal_msg.timeout_sec = 10.0
         goal_msg.allow_orientation = True  # Ignore orientation constraints
-        goal_msg.electromagnet_on = False  # Don't change electromagnet
-        
+        goal_msg.electromagnet_on = self.electromagnet_on  # Keep electromagnet state after move
+
         self.current_pose_lock = True
         self._update_status(f"Moving to ({x:.3f}, {y:.3f}, {z:.3f})...", "blue")
         
@@ -689,67 +629,6 @@ class GArmJogGUI(Node):
             self._update_status(f"Electromagnet {'ON' if turn_on else 'OFF'}", "green")
         else:
             self._update_status(f"Electromagnet command failed: {result.error_string}", "red")
-    
-    def _toggle_led(self, pin):
-        """Toggle LED on/off"""
-        if not GPIO_AVAILABLE or self.gpio_action_client is None:
-            self._update_status("Error: GPIO interface not available", "red")
-            return
-        
-        if pin not in self.led_vars:
-            self._update_status(f"Error: LED {pin} control not available", "red")
-            return
-        
-        target_state = self.led_vars[pin].get()
-        
-        if target_state == self.led_states.get(pin, False):
-            return  # Already in desired state
-        
-        self.led_states[pin] = target_state
-        self._control_led(pin, target_state)
-    
-    def _control_led(self, pin, turn_on):
-        """Control LED via GPIO action client (connects to Raspberry Pi GPIO server)"""
-        if not GPIO_AVAILABLE or self.gpio_action_client is None:
-            self._update_status("Error: GPIO interface not available", "red")
-            return
-        
-        if not self.gpio_action_client.wait_for_server(timeout_sec=1.0):
-            self._update_status("Error: GPIO action server not available (check Raspberry Pi connection)", "red")
-            return
-        
-        # Create goal
-        goal = GPIO.Goal()
-        goal.gpio = f"{pin},{'high' if turn_on else 'low'}"
-        
-        # Send goal asynchronously
-        send_goal_future = self.gpio_action_client.send_goal_async(goal)
-        send_goal_future.add_done_callback(
-            lambda future, p=pin, state=turn_on: self._led_goal_response_callback(future, p, state)
-        )
-        
-        self._update_status(f"Turning LED {pin} {'ON' if turn_on else 'OFF'}...", "blue")
-    
-    def _led_goal_response_callback(self, future, pin, turn_on):
-        """Callback for LED goal response"""
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            self._update_status(f"Failed to send LED {pin} command", "red")
-            return
-        
-        # Get result
-        result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(
-            lambda future, p=pin, state=turn_on: self._led_result_callback(future, p, state)
-        )
-    
-    def _led_result_callback(self, future, pin, turn_on):
-        """Callback for LED result"""
-        result = future.result().result
-        if result.success:
-            self._update_status(f"LED {pin} {'ON' if turn_on else 'OFF'}", "green")
-        else:
-            self._update_status(f"LED {pin} command failed", "red")
     
     def _schedule_ros_spin(self):
         """Schedule periodic ROS2 spinning (non-blocking)"""
