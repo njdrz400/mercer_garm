@@ -9,14 +9,19 @@ import queue
 import random
 import time
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+from tkinter import ttk, messagebox, scrolledtext, filedialog
 
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
+from tf2_ros import Buffer, TransformListener, TransformException
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from g_arm_msgs.action import GoToPose
 from ament_index_python.packages import get_package_share_directory
+from control_msgs.action import FollowJointTrajectory
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from builtin_interfaces.msg import Duration as RosDuration
+from action_msgs.msg import GoalStatus
 
 try:
     import serial
@@ -157,9 +162,39 @@ class MacropadTictactoeNode(Node):
 
         # Robot arm: move piece from red/blue home to board cell (GoToPose action)
         self._go_to_pose_client = ActionClient(self, GoToPose, 'go_to_pose')
+        # TF: used for calibration "save from current pose"
+        self._base_frame = 'base_link'
+        self._end_effector_frame = 'end_effector_tip'  # must exist in TF tree
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
         self._robot_move_pick = None   # waypoint name (R0x or B0x) while move in progress
         self._robot_move_place = None  # waypoint name (T0x)
         self._robot_move_step = 0      # 0=go pick mag off, 1=grab, 2=go place, 3=release
+        # Extra guards (beyond step-by-step chaining):
+        # - sequence_busy: a multi-step place sequence is active
+        # - pose_goal_in_flight: a GoToPose goal is currently executing
+        # - em_goal_in_flight: an electromagnet FollowJointTrajectory goal is executing
+        self._robot_sequence_busy = False
+        self._pose_goal_in_flight = False
+        self._em_goal_in_flight = False
+        # When 2P mode is active, we delay enabling the next player's input until
+        # the robot finishes all pose changes for the current move.
+        self._pending_turn_value = None   # 'X' or 'O'
+        self._pending_turn_command = None # 'rtrn' or 'btrn'
+
+        # Electromagnet control (separate from GoToPose) to guarantee ON/OFF
+        # GoToPose server toggles electromagnet only after successful motion and may skip
+        # OFF if it cannot read jointPWM correctly from /joint_states.
+        self._em_tool_action_client = ActionClient(
+            self, FollowJointTrajectory, '/tool_controller/follow_joint_trajectory'
+        )
+        self._em_magnet_action_client = ActionClient(
+            self, FollowJointTrajectory, '/magnet_controller/follow_joint_trajectory'
+        )
+        # Track last manual electromagnet state for toggle button (False = OFF)
+        self._manual_em_last_state = False
+        # When reset is pressed: queue of (from_waypoint, to_waypoint) to return pieces to home
+        self._reset_return_queue = None
 
         self._root = None
         self._status_var = None
@@ -170,27 +205,18 @@ class MacropadTictactoeNode(Node):
         self._log_text = None
 
     def _load_waypoints(self):
-        """Load waypoints from config/waypoints.yaml (used to guide robot arm)."""
+        """Load waypoints from the active waypoints YAML path."""
         if yaml is None:
             self.get_logger().warn("python3-yaml not available; waypoints not loaded")
             return
-        path = None
-        try:
-            pkg_share = get_package_share_directory('macropad_tictactoe')
-            path = os.path.join(pkg_share, 'config', 'waypoints.yaml')
-        except Exception:
-            pass
-        if not path or not os.path.isfile(path):
-            # Fallback: config next to package (e.g. when running from source)
-            this_dir = os.path.dirname(os.path.abspath(__file__))
-            path = os.path.join(os.path.dirname(this_dir), 'config', 'waypoints.yaml')
+        path = self._waypoints_yaml_path()
         try:
             if os.path.isfile(path):
                 with open(path, 'r') as f:
                     data = yaml.safe_load(f)
                 self._waypoints = data.get('waypoints', {})
                 self.get_logger().info(
-                    "Loaded %d waypoints from config/waypoints.yaml" % len(self._waypoints)
+                    "Loaded %d waypoints from %s" % (len(self._waypoints), path)
                 )
             else:
                 self.get_logger().warn("waypoints.yaml not found at %s" % path)
@@ -198,6 +224,122 @@ class MacropadTictactoeNode(Node):
         except Exception as e:
             self.get_logger().warn("Could not load waypoints: %s" % e)
             self._waypoints = {}
+
+    def _on_reload_waypoints(self):
+        """Reload waypoints from YAML on demand."""
+        self._load_waypoints()
+        if getattr(self, '_log_text', None) is not None:
+            self._log("Waypoints reloaded from %s (%d waypoints)." % (self._waypoints_yaml_path(), len(self._waypoints)))
+            self._log_waypoints()
+
+    def _on_browse_waypoints_yaml(self):
+        """Open a dialog to select a waypoints.yaml file, then reload it."""
+        initial = ''
+        try:
+            initial = self._waypoints_yaml_path_var.get().strip()
+        except Exception:
+            initial = ''
+
+        selected = filedialog.askopenfilename(
+            title="Select waypoints.yaml",
+            initialdir=os.path.dirname(initial) if initial else None,
+            filetypes=[("YAML files", "*.yaml *.yml"), ("All files", "*.*")]
+        )
+        if not selected:
+            return
+        self._waypoints_yaml_path_var.set(selected)
+        self._on_reload_waypoints()
+
+    def _default_waypoints_yaml_path(self):
+        """Return default absolute path to macropad_tictactoe/config/waypoints.yaml."""
+        
+        return '/home/rosuser/mercer_garm/ros2/src/macropad_tictactoe/config/waypoints.yaml'
+
+    def _waypoints_yaml_path(self):
+        """Return active absolute path to waypoints.yaml (GUI override if provided)."""
+        override = None
+        if getattr(self, '_waypoints_yaml_path_var', None) is not None:
+            try:
+                override = self._waypoints_yaml_path_var.get().strip()
+            except Exception:
+                override = None
+
+        if override:
+            expanded = os.path.expanduser(override)
+            abs_path = expanded if os.path.isabs(expanded) else os.path.abspath(expanded)
+            return abs_path
+
+        return self._default_waypoints_yaml_path()
+
+    def _persist_waypoints(self):
+        """Write the current self._waypoints back to config/waypoints.yaml."""
+        if yaml is None:
+            raise RuntimeError("python3-yaml not available; cannot save waypoints")
+        path = self._waypoints_yaml_path()
+        out_dir = os.path.dirname(path) or "."
+        if not os.path.isdir(out_dir):
+            raise RuntimeError("Directory for waypoints.yaml does not exist: %s" % out_dir)
+
+        # Keep the same top-level structure the loader expects.
+        data = {'waypoints': dict(self._waypoints)}
+        if os.path.isfile(path):
+            try:
+                with open(path, 'r') as f:
+                    loaded = yaml.safe_load(f) or {}
+                if isinstance(loaded, dict) and 'waypoints' in loaded:
+                    data = loaded
+                    data['waypoints'] = dict(self._waypoints)
+            except Exception:
+                # If reading fails, still try to write the minimal structure.
+                pass
+
+        tmp_path = path + ".tmp"
+        with open(tmp_path, 'w') as f:
+            yaml.safe_dump(data, f, sort_keys=False)
+        os.replace(tmp_path, path)
+
+    def _update_waypoint_xyz(self, waypoint_name, x_m, y_m, z_m):
+        """Update x/y/z for a waypoint in-memory (does not write YAML)."""
+        self._waypoints[waypoint_name] = {'x': float(x_m), 'y': float(y_m), 'z': float(z_m)}
+
+    def _get_current_pose_from_tf(self, warn_on_fail=True):
+        """Get current end-effector pose from TF (returns PoseStamped or None)."""
+        try:
+            transform = self._tf_buffer.lookup_transform(
+                self._base_frame,
+                self._end_effector_frame,
+                rclpy.time.Time(),
+            )
+            pose = PoseStamped()
+            pose.header.frame_id = self._base_frame
+            pose.header.stamp = transform.header.stamp
+            pose.pose.position = Point(
+                x=transform.transform.translation.x,
+                y=transform.transform.translation.y,
+                z=transform.transform.translation.z,
+            )
+            pose.pose.orientation = transform.transform.rotation
+            return pose
+        except TransformException as ex:
+            if warn_on_fail:
+                self.get_logger().warn("Calibration: could not read current pose from TF: %s" % ex)
+            return None
+
+    def _get_piece_heights_m(self):
+        """Return (pickup_lift_m, transit_height_m, drop_height_m) from GUI vars; use defaults on invalid input."""
+        try:
+            pickup_mm = float(self._pickup_lift_mm_var.get().strip())
+        except (ValueError, AttributeError):
+            pickup_mm = 10.0
+        try:
+            transit_mm = float(self._transit_height_mm_var.get().strip())
+        except (ValueError, AttributeError):
+            transit_mm = 10.0
+        try:
+            drop_mm = float(self._drop_height_mm_var.get().strip())
+        except (ValueError, AttributeError):
+            drop_mm = 5.0
+        return (pickup_mm / 1000.0, transit_mm / 1000.0, drop_mm / 1000.0)
 
     def _waypoint_pose(self, waypoint_name, frame_id='base_link'):
         """Build PoseStamped for a waypoint name (must be in self._waypoints)."""
@@ -214,11 +356,308 @@ class MacropadTictactoeNode(Node):
         pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
         return pose
 
+    def _robot_is_busy(self):
+        return bool(self._robot_sequence_busy or self._pose_goal_in_flight or self._em_goal_in_flight)
+
+    def _robot_send_em_command_async(self, turn_on, step_for_logging):
+        """Send a direct electromagnet ON/OFF command and advance place sequence.
+
+        Uses FollowJointTrajectory on the electromagnet controller directly so we do not
+        rely on GoToPose server's internal "current_pwm" check.
+        """
+        if self._em_goal_in_flight:
+            return
+        self._em_goal_in_flight = True
+        target_pwm = 1.0 if turn_on else 0.0
+
+        client = None
+        controller_name = None
+        for name, c in (
+            ("tool_controller", self._em_tool_action_client),
+            ("magnet_controller", self._em_magnet_action_client),
+        ):
+            if c.wait_for_server(timeout_sec=0.2):
+                client = c
+                controller_name = name
+                break
+
+        if client is None:
+            self.get_logger().warn("Electromagnet action server not available; skipping em command")
+            self._log("Robot magnet command skipped (server not available).")
+            self._em_goal_in_flight = False
+            # Still advance sequence to avoid deadlock
+            self._robot_move_step += 1
+            self._log("Robot magnet step %d/8 completed (skipped)." % self._robot_move_step)
+            if self._robot_move_step >= 8:
+                from_wp = self._robot_move_pick
+                to_wp = self._robot_move_place
+                self._robot_move_pick = self._robot_move_place = None
+                self._robot_move_step = 0
+                self._robot_sequence_busy = False
+                self._manual_em_last_state = False
+                self._schedule_update_magnet_button()
+                if self._reset_return_queue is not None:
+                    for i in range(5):
+                        if self._red_piece_locations[i] == from_wp:
+                            self._red_piece_locations[i] = to_wp
+                            break
+                        if self._blue_piece_locations[i] == from_wp:
+                            self._blue_piece_locations[i] = to_wp
+                            break
+                    self._update_piece_locations_display()
+                    if self._reset_return_queue:
+                        from_next, to_next = self._reset_return_queue.pop(0)
+                        self._robot_move_pick = from_next
+                        self._robot_move_place = to_next
+                        self._robot_move_step = 0
+                        self._robot_sequence_busy = True
+                        self._log("Robot: reset - returning %s -> %s" % (from_next, to_next))
+                        if self._root and self._root.winfo_exists():
+                            self._root.after(250, self._robot_place_piece_step)
+                        else:
+                            self._robot_place_piece_step()
+                    else:
+                        self._reset_return_queue = None
+                        self._log("Reset: all pieces returned (magnet skipped). Resetting game.")
+                        self._do_logical_reset()
+                else:
+                    self.get_logger().info("Robot placed piece; at MID, waiting for next command.")
+                    self._log("Robot: piece placed, at MID (magnet off), waiting for next command.")
+                self._set_robot_pose_status("(at MID, magnet off)", "Done: at MID, waiting for next command.")
+                return
+            if self._root and self._root.winfo_exists():
+                self._root.after(250, self._robot_place_piece_step)
+            else:
+                self._robot_place_piece_step()
+            return
+
+        goal_msg = FollowJointTrajectory.Goal()
+        goal_msg.trajectory = JointTrajectory()
+        goal_msg.trajectory.joint_names = ["jointPWM"]
+        point = JointTrajectoryPoint()
+        point.positions = [target_pwm]
+        point.time_from_start = RosDuration(sec=0, nanosec=500_000_000)  # 0.5s
+        goal_msg.trajectory.points = [point]
+
+        self._log(
+            "Robot magnet command (step %d/%d): %s via %s (jointPWM=%.1f)"
+            % (step_for_logging + 1, 8, "ON" if turn_on else "OFF", controller_name, target_pwm)
+        )
+        self._set_robot_pose_status(
+            "(electromagnet %s)" % ("ON" if turn_on else "OFF"),
+            "Electromagnet command..."
+        )
+
+        send_future = client.send_goal_async(goal_msg)
+        send_future.add_done_callback(lambda f: self._robot_em_goal_response_callback(f, turn_on, step_for_logging))
+
+    def _send_manual_em_command(self, turn_on):
+        """Send a standalone electromagnet ON/OFF command (manual toggle, no place sequence)."""
+        if self._em_goal_in_flight:
+            self.get_logger().warn("Electromagnet command busy; ignoring manual toggle.")
+            self._log("Magnet: command busy, try again.")
+            return
+        client = None
+        controller_name = None
+        for name, c in (
+            ("tool_controller", self._em_tool_action_client),
+            ("magnet_controller", self._em_magnet_action_client),
+        ):
+            if c.wait_for_server(timeout_sec=0.2):
+                client = c
+                controller_name = name
+                break
+        if client is None:
+            self.get_logger().warn("Electromagnet action server not available.")
+            self._log("Magnet: server not available.")
+            return
+        self._em_goal_in_flight = True
+        target_pwm = 1.0 if turn_on else 0.0
+        goal_msg = FollowJointTrajectory.Goal()
+        goal_msg.trajectory = JointTrajectory()
+        goal_msg.trajectory.joint_names = ["jointPWM"]
+        point = JointTrajectoryPoint()
+        point.positions = [target_pwm]
+        point.time_from_start = RosDuration(sec=0, nanosec=500_000_000)  # 0.5s
+        goal_msg.trajectory.points = [point]
+        self._log("Manual magnet %s via %s" % ("ON" if turn_on else "OFF", controller_name))
+        self._set_robot_pose_status(
+            "(electromagnet %s)" % ("ON" if turn_on else "OFF"),
+            "Electromagnet command...",
+        )
+        send_future = client.send_goal_async(goal_msg)
+        send_future.add_done_callback(lambda f: self._manual_em_goal_response_callback(f, turn_on))
+
+    def _manual_em_goal_response_callback(self, future, turn_on):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().warn("Manual magnet goal rejected")
+            self._em_goal_in_flight = False
+            self._schedule_update_magnet_button()
+            return
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(lambda f: self._manual_em_result_callback(f, turn_on))
+
+    def _manual_em_result_callback(self, future, turn_on):
+        response = future.result()
+        status = getattr(response, "status", None)
+        succeeded = (status == GoalStatus.STATUS_SUCCEEDED) if status is not None else True
+        self._em_goal_in_flight = False
+        if succeeded:
+            self._manual_em_last_state = turn_on
+            self.get_logger().info("Manual magnet turned %s" % ("ON" if turn_on else "OFF"))
+            self._log("Magnet: %s." % ("ON" if turn_on else "OFF"))
+        else:
+            self.get_logger().warn("Manual magnet command failed (status=%s)" % status)
+            self._log("Magnet: command failed.")
+        self._schedule_update_magnet_button()
+
+    def _schedule_update_magnet_button(self):
+        """Update magnet toggle button label on the GUI thread."""
+        if self._root and self._root.winfo_exists() and getattr(self, "_magnet_toggle_btn", None):
+            self._root.after(0, self._update_magnet_toggle_button)
+
+    def _update_magnet_toggle_button(self):
+        if getattr(self, "_magnet_toggle_btn", None) and self._magnet_toggle_btn.winfo_exists():
+            self._magnet_toggle_btn.config(text="Magnet ON" if self._manual_em_last_state else "Magnet OFF")
+
+    def _on_manual_toggle_magnet(self):
+        """Toggle electromagnet ON/OFF via manual button."""
+        turn_on = not self._manual_em_last_state
+        self._send_manual_em_command(turn_on)
+
+    def _robot_em_goal_response_callback(self, future, turn_on, step_for_logging):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().warn("Robot magnet goal rejected")
+            self._em_goal_in_flight = False
+            # Advance sequence anyway
+            self._robot_move_step += 1
+            self._log("Robot magnet step %d/8 completed (rejected)." % self._robot_move_step)
+            if self._robot_move_step >= 8:
+                from_wp = self._robot_move_pick
+                to_wp = self._robot_move_place
+                self._robot_move_pick = self._robot_move_place = None
+                self._robot_move_step = 0
+                self._robot_sequence_busy = False
+                self._manual_em_last_state = False
+                self._schedule_update_magnet_button()
+                if self._reset_return_queue is not None:
+                    for i in range(5):
+                        if self._red_piece_locations[i] == from_wp:
+                            self._red_piece_locations[i] = to_wp
+                            break
+                        if self._blue_piece_locations[i] == from_wp:
+                            self._blue_piece_locations[i] = to_wp
+                            break
+                    self._update_piece_locations_display()
+                    if self._reset_return_queue:
+                        from_next, to_next = self._reset_return_queue.pop(0)
+                        self._robot_move_pick = from_next
+                        self._robot_move_place = to_next
+                        self._robot_move_step = 0
+                        self._robot_sequence_busy = True
+                        self._log("Robot: reset - returning %s -> %s" % (from_next, to_next))
+                        if self._root and self._root.winfo_exists():
+                            self._root.after(250, self._robot_place_piece_step)
+                        else:
+                            self._robot_place_piece_step()
+                    else:
+                        self._reset_return_queue = None
+                        self._log("Reset: all pieces returned (magnet rejected). Resetting game.")
+                        self._do_logical_reset()
+                else:
+                    self.get_logger().info("Robot placed piece; at MID, waiting for next command.")
+                    self._log("Robot: piece placed, at MID (magnet off), waiting for next command.")
+                self._set_robot_pose_status("(at MID, magnet off)", "Done: at MID, waiting for next command.")
+                return
+            if self._root and self._root.winfo_exists():
+                self._root.after(250, self._robot_place_piece_step)
+            else:
+                self._robot_place_piece_step()
+            return
+
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(lambda f: self._robot_em_result_callback(f, turn_on, step_for_logging))
+
+    def _robot_em_result_callback(self, future, turn_on, step_for_logging):
+        response = future.result()
+        status = getattr(response, "status", None)
+        succeeded = (status == GoalStatus.STATUS_SUCCEEDED) if status is not None else True
+        self._em_goal_in_flight = False
+        if succeeded:
+            self.get_logger().info("Robot magnet turned %s" % ("ON" if turn_on else "OFF"))
+            self._log("Robot magnet step %d/8 completed." % (step_for_logging + 1))
+        else:
+            self.get_logger().warn("Robot magnet command failed (status=%s)" % status)
+            self._log("Robot magnet step %d/8 completed (failed)." % (step_for_logging + 1))
+
+        # Advance sequence
+        self._robot_move_step += 1
+        if self._robot_move_step >= 8:
+            from_wp = self._robot_move_pick
+            to_wp = self._robot_move_place
+            self._robot_move_pick = self._robot_move_place = None
+            self._robot_move_step = 0
+            self._robot_sequence_busy = False
+            self._manual_em_last_state = False  # sequence ends with magnet OFF
+            self._schedule_update_magnet_button()
+            # If we were in reset mode: update piece location and run next return or finish reset
+            if self._reset_return_queue is not None:
+                for i in range(5):
+                    if self._red_piece_locations[i] == from_wp:
+                        self._red_piece_locations[i] = to_wp
+                        break
+                    if self._blue_piece_locations[i] == from_wp:
+                        self._blue_piece_locations[i] = to_wp
+                        break
+                self._update_piece_locations_display()
+                if self._reset_return_queue:
+                    from_next, to_next = self._reset_return_queue.pop(0)
+                    self._robot_move_pick = from_next
+                    self._robot_move_place = to_next
+                    self._robot_move_step = 0
+                    self._robot_sequence_busy = True
+                    self._log("Robot: reset - returning %s -> %s" % (from_next, to_next))
+                    if self._root and self._root.winfo_exists():
+                        self._root.after(250, self._robot_place_piece_step)
+                    else:
+                        self._robot_place_piece_step()
+                else:
+                    self._reset_return_queue = None
+                    self.get_logger().info("Robot finished returning all pieces; resetting game.")
+                    self._log("Reset: all pieces returned. Resetting game.")
+                    self._do_logical_reset()
+                self._set_robot_pose_status("(at MID, magnet off)", "Done: at MID, waiting for next command.")
+                return
+            self.get_logger().info("Robot placed piece; at MID, waiting for next command.")
+            self._log("Robot: piece placed, at MID (magnet off), waiting for next command.")
+            # If we were waiting to switch turns (2P mode), do it now.
+            if self._pending_turn_value is not None and self._pending_turn_command is not None:
+                self._turn = self._pending_turn_value
+                self._send_command(self._pending_turn_command)
+                self._pending_turn_value = None
+                self._pending_turn_command = None
+                self._update_status()
+            self._set_robot_pose_status("(at MID, magnet off)", "Done: at MID, waiting for next command.")
+            return
+        if self._root and self._root.winfo_exists():
+            self._root.after(250, self._robot_place_piece_step)
+        else:
+            self._robot_place_piece_step()
+
     def _robot_place_piece_step(self):
-        """Send one step of pick->grab->place->release. Steps 0–3; called from _place or result callback."""
+        """Send one step of pick->grab->lift->approach->lower&release->magnet_off->return to MID->magnet_off at MID.
+        Steps 0–7 (no via-MID step).
+        """
         if self._robot_move_pick is None or self._robot_move_place is None:
             return
         step = self._robot_move_step
+        # Magnet-only steps: send direct electromagnet command to guarantee OFF even if
+        # GoToPose server skips its internal OFF due to missing/incorrect jointPWM feedback.
+        if step in (5, 7):
+            self._robot_send_em_command_async(False, step)
+            return
         if step == 0:
             wp_name = self._robot_move_pick
             magnet_on = False
@@ -226,20 +665,83 @@ class MacropadTictactoeNode(Node):
             wp_name = self._robot_move_pick
             magnet_on = True
         elif step == 2:
-            wp_name = self._robot_move_place
+            # Lift after grab — magnet stays ON while carrying piece
+            wp_name = self._robot_move_pick + "_LIFT"
             magnet_on = True
+        elif step == 3:
+            # Approach board: stay 10mm above T0X waypoint, magnet on
+            wp_name = self._robot_move_place + "+10mm"
+            magnet_on = True
+        elif step == 4:
+            # Lower to 5mm above waypoint and turn off magnet
+            wp_name = self._robot_move_place + "+5mm"
+            magnet_on = False
+        elif step == 6:
+            # Move to MID (magnet off requested; server may only apply on success)
+            wp_name = 'MID'
+            magnet_on = False
+        elif step == 7:
+            # Explicit magnet-off at MID (handled by magnet-only step 7)
+            wp_name = 'MID_off'
+            magnet_on = False
         else:
             wp_name = self._robot_move_place
             magnet_on = False
-        pose = self._waypoint_pose(wp_name)
+        pickup_m, transit_m, drop_m = self._get_piece_heights_m()
+        if step in (0, 1):
+            # Pickup pose: use waypoint x,y,z (and orientation) directly from YAML
+            pose = self._waypoint_pose(self._robot_move_pick)
+            if pose:
+                # no z override
+                pass
+        elif step == 2:
+            # Lift pose: add pickup height (mm from GUI) on top of the waypoint z
+            pose = self._waypoint_pose(self._robot_move_pick)
+            if pose:
+                pose.pose.position.z += pickup_m
+        elif step == 3:
+            # Approach board: transit height above T0X waypoint
+            pose = self._waypoint_pose(self._robot_move_place)
+            if pose:
+                pose.pose.position.z += transit_m
+        elif step == 4:
+            # Lower & release at drop height above board
+            pose = self._waypoint_pose(self._robot_move_place)
+            if pose:
+                pose.pose.position.z += drop_m
+        elif step == 7:
+            # Same pose as MID (explicit magnet-off at MID)
+            pose = self._waypoint_pose('MID')
+        else:
+            pose = self._waypoint_pose(wp_name)
         if not pose:
             self.get_logger().warn("Robot move: waypoint '%s' not found" % wp_name)
             self._robot_move_pick = self._robot_move_place = None
+            self._robot_move_step = 0
+            self._robot_sequence_busy = False
+            if self._reset_return_queue is not None:
+                self._reset_return_queue = None
+                self._log("Reset aborted: waypoint '%s' not found." % wp_name)
+                self._do_logical_reset()
+            else:
+                self._set_robot_pose_status("waypoint '%s' not in config" % wp_name, "Aborted: waypoint not found")
             return
         if not self._go_to_pose_client.wait_for_server(timeout_sec=0.5):
             self.get_logger().warn("Robot move: go_to_pose server not available")
             self._robot_move_pick = self._robot_move_place = None
+            self._robot_move_step = 0
+            self._robot_sequence_busy = False
+            self._pose_goal_in_flight = False
+            if self._reset_return_queue is not None:
+                self._reset_return_queue = None
+                self._log("Reset aborted: go_to_pose server not available.")
+                self._do_logical_reset()
+            else:
+                self._set_robot_pose_status("go_to_pose action server not available", "Aborted: server not available")
             return
+        if self._pose_goal_in_flight:
+            return
+        self._pose_goal_in_flight = True
         goal_msg = GoToPose.Goal()
         goal_msg.target = pose
         goal_msg.pos_tolerance_m = 0.01
@@ -247,6 +749,29 @@ class MacropadTictactoeNode(Node):
         goal_msg.timeout_sec = 15.0
         goal_msg.allow_orientation = True
         goal_msg.electromagnet_on = magnet_on
+        # Display pose details and status
+        step_labels = (
+            "pick (magnet off)",
+            "grab (magnet on)",
+            "lift pickup (magnet on)",
+            "approach board transit (magnet on)",
+            "lower to drop & release (magnet off)",
+            "magnet OFF (same pose)",
+            "return to MID (magnet off)",
+            "magnet OFF at MID (same pose)",
+        )
+        p = pose.pose.position
+        details = (
+            "waypoint=%s  frame=%s  x=%.3f  y=%.3f  z=%.3f  electromagnet=%s  "
+            "pos_tol=%.3fm  timeout=%.1fs  [step %d/8: %s]"
+        ) % (wp_name, pose.header.frame_id, p.x, p.y, p.z, "ON" if magnet_on else "OFF",
+             0.01, 15.0, step + 1, step_labels[step])
+        self._set_robot_pose_status(details, "Moving... (step %d/8)" % (step + 1))
+        # Log waypoint to log box when sending pose command
+        self._log(
+            "Robot pose step %d/8: waypoint=%s  x=%.3f  y=%.3f  z=%.3f  magnet=%s  [%s]"
+            % (step + 1, wp_name, p.x, p.y, p.z, "ON" if magnet_on else "OFF", step_labels[step])
+        )
         send_future = self._go_to_pose_client.send_goal_async(goal_msg)
         send_future.add_done_callback(self._robot_place_goal_response_callback)
 
@@ -256,33 +781,75 @@ class MacropadTictactoeNode(Node):
         if not goal_handle.accepted:
             self.get_logger().warn("Robot place: goal rejected")
             self._robot_move_pick = self._robot_move_place = None
+            self._robot_move_step = 0
+            self._robot_sequence_busy = False
+            self._pose_goal_in_flight = False
+            if self._reset_return_queue is not None:
+                self._reset_return_queue = None
+                self._log("Reset aborted: goal rejected.")
+                self._do_logical_reset()
+            else:
+                self._set_robot_pose_status("(goal was rejected by action server)", "Goal rejected")
             return
+        self._set_robot_pose_status("(see above)", "Goal accepted, executing...")
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self._robot_place_result_callback)
 
     def _robot_place_result_callback(self, future):
-        """After each step: advance or finish. Next step is scheduled from executor context."""
+        """After each step: advance or finish. Next step only runs after this command finished."""
         result = future.result().result
+        self._pose_goal_in_flight = False
         if not result.success:
-            self.get_logger().warn("Robot place step failed: %s" % getattr(result, 'message', ''))
-            self._robot_move_pick = self._robot_move_place = None
-            return
-        self._robot_move_step += 1
-        if self._robot_move_step >= 4:
+            msg = getattr(result, 'message', '') or 'Unknown error'
+            self.get_logger().warn("Robot place step failed: %s" % msg)
             self._robot_move_pick = self._robot_move_place = None
             self._robot_move_step = 0
-            self.get_logger().info("Robot placed piece.")
+            self._robot_sequence_busy = False
+            if self._reset_return_queue is not None:
+                self._reset_return_queue = None
+                self._log("Reset aborted: %s" % msg)
+                self._do_logical_reset()
+            else:
+                err_detail = "error_code=%s  final_pos_err=%.4fm  message=%s" % (
+                    getattr(result, 'error_code', ''), getattr(result, 'final_pos_error_m', 0), msg)
+                self._set_robot_pose_status(err_detail, "Failed: " + msg)
             return
-        self._robot_place_piece_step()
+        self._robot_move_step += 1
+        self._log("Robot pose step %d/8 completed." % self._robot_move_step)
+        if self._robot_move_step >= 8:
+            self._robot_move_pick = self._robot_move_place = None
+            self._robot_move_step = 0
+            self._robot_sequence_busy = False
+            self.get_logger().info("Robot placed piece; at MID, waiting for next command.")
+            self._log("Robot: piece placed, at MID (magnet off), waiting for next command.")
+            # If we were waiting to switch turns (2P mode), do it now.
+            if self._pending_turn_value is not None and self._pending_turn_command is not None:
+                self._turn = self._pending_turn_value
+                self._send_command(self._pending_turn_command)
+                self._pending_turn_value = None
+                self._pending_turn_command = None
+                self._update_status()
+            self._set_robot_pose_status("(at MID, magnet off)", "Done: at MID, waiting for next command.")
+            return
+        # Pause 250 ms after each pose move, then send next step
+        if self._root and self._root.winfo_exists():
+            self._root.after(250, self._robot_place_piece_step)
+        else:
+            self._robot_place_piece_step()
 
     def _robot_go_home(self):
         """Send robot to HOME waypoint (non-blocking). Called on game reset."""
+        if self._robot_is_busy():
+            self._log("Robot busy, skipping HOME command.")
+            return
         pose = self._waypoint_pose('HOME')
         if not pose:
             self.get_logger().warn("Robot go home: HOME waypoint not found")
+            self._set_robot_pose_status("HOME waypoint not in config", "Aborted: HOME not found")
             return
         if not self._go_to_pose_client.wait_for_server(timeout_sec=0.5):
             self.get_logger().warn("Robot go home: go_to_pose server not available")
+            self._set_robot_pose_status("go_to_pose action server not available", "Aborted: server not available")
             return
         goal_msg = GoToPose.Goal()
         goal_msg.target = pose
@@ -291,6 +858,13 @@ class MacropadTictactoeNode(Node):
         goal_msg.timeout_sec = 15.0
         goal_msg.allow_orientation = True
         goal_msg.electromagnet_on = False
+        p = pose.pose.position
+        details = (
+            "waypoint=HOME  frame=%s  x=%.3f  y=%.3f  z=%.3f  electromagnet=OFF  "
+            "pos_tol=0.010m  timeout=15.0s"
+        ) % (pose.header.frame_id, p.x, p.y, p.z)
+        self._set_robot_pose_status(details, "Moving to HOME...")
+        self._log("Robot pose: waypoint=HOME  x=%.3f  y=%.3f  z=%.3f" % (p.x, p.y, p.z))
         send_future = self._go_to_pose_client.send_goal_async(goal_msg)
         send_future.add_done_callback(self._robot_go_home_response_callback)
 
@@ -298,7 +872,9 @@ class MacropadTictactoeNode(Node):
         goal_handle = future.result()
         if not goal_handle.accepted:
             self.get_logger().warn("Robot go home: goal rejected")
+            self._set_robot_pose_status("(goal was rejected by action server)", "Goal rejected")
             return
+        self._set_robot_pose_status("(see above)", "Goal accepted, executing...")
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self._robot_go_home_result_callback)
 
@@ -306,13 +882,373 @@ class MacropadTictactoeNode(Node):
         result = future.result().result
         if result.success:
             self.get_logger().info("Robot at HOME.")
+            self._set_robot_pose_status("(last goal: HOME)", "Done: at HOME.")
+            self._schedule_manual_xyz_update_from_tf()
         else:
-            self.get_logger().warn("Robot go home failed: %s" % getattr(result, 'message', ''))
+            msg = getattr(result, 'message', '') or 'Unknown error'
+            self.get_logger().warn("Robot go home failed: %s" % msg)
+            err_detail = "error_code=%s  final_pos_err=%.4fm  message=%s" % (
+                getattr(result, 'error_code', ''), getattr(result, 'final_pos_error_m', 0), msg)
+            self._set_robot_pose_status(err_detail, "Failed: " + msg)
+
+    def _robot_go_mid(self):
+        """Send robot to MID waypoint (non-blocking). For manual control."""
+        if self._robot_is_busy():
+            self._set_robot_pose_status("Robot busy (finish current move first)", "Blocked: robot busy")
+            return
+        pose = self._waypoint_pose('MID')
+        if not pose:
+            self.get_logger().warn("Robot go MID: MID waypoint not found")
+            self._set_robot_pose_status("MID waypoint not in config", "Aborted: MID not found")
+            return
+        if not self._go_to_pose_client.wait_for_server(timeout_sec=0.5):
+            self.get_logger().warn("Robot go MID: go_to_pose server not available")
+            self._set_robot_pose_status("go_to_pose action server not available", "Aborted: server not available")
+            return
+        goal_msg = GoToPose.Goal()
+        goal_msg.target = pose
+        goal_msg.pos_tolerance_m = 0.01
+        goal_msg.ang_tolerance_rad = 6.28
+        goal_msg.timeout_sec = 15.0
+        goal_msg.allow_orientation = True
+        goal_msg.electromagnet_on = False
+        p = pose.pose.position
+        details = (
+            "waypoint=MID  frame=%s  x=%.3f  y=%.3f  z=%.3f  electromagnet=OFF  "
+            "pos_tol=0.010m  timeout=15.0s"
+        ) % (pose.header.frame_id, p.x, p.y, p.z)
+        self._set_robot_pose_status(details, "Moving to MID...")
+        self._log("Robot pose: waypoint=MID  x=%.3f  y=%.3f  z=%.3f" % (p.x, p.y, p.z))
+        send_future = self._go_to_pose_client.send_goal_async(goal_msg)
+        send_future.add_done_callback(self._robot_go_mid_response_callback)
+
+    def _robot_go_mid_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().warn("Robot go MID: goal rejected")
+            self._set_robot_pose_status("(goal was rejected by action server)", "Goal rejected")
+            return
+        self._set_robot_pose_status("(see above)", "Goal accepted, executing...")
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self._robot_go_mid_result_callback)
+
+    def _robot_go_mid_result_callback(self, future):
+        result = future.result().result
+        if result.success:
+            self.get_logger().info("Robot at MID.")
+            self._set_robot_pose_status("(last goal: MID)", "Done: at MID.")
+            self._schedule_manual_xyz_update_from_tf()
+        else:
+            msg = getattr(result, 'message', '') or 'Unknown error'
+            self.get_logger().warn("Robot go MID failed: %s" % msg)
+            err_detail = "error_code=%s  final_pos_err=%.4fm  message=%s" % (
+                getattr(result, 'error_code', ''), getattr(result, 'final_pos_error_m', 0), msg)
+            self._set_robot_pose_status(err_detail, "Failed: " + msg)
+
+    def _on_manual_move(self):
+        """Move robot to user-entered x, y, z (frame base_link)."""
+        if self._robot_is_busy():
+            self._set_robot_pose_status("Robot busy (finish current move first)", "Blocked: robot busy")
+            return
+        try:
+            x = float(self._manual_x_var.get().strip())
+            y = float(self._manual_y_var.get().strip())
+            z = float(self._manual_z_var.get().strip())
+        except ValueError:
+            self._set_robot_pose_status("Invalid x, y, z (enter numbers)", "Error: invalid input")
+            return
+        if not self._go_to_pose_client.wait_for_server(timeout_sec=0.5):
+            self._set_robot_pose_status("go_to_pose action server not available", "Aborted: server not available")
+            return
+        pose = PoseStamped()
+        pose.header.frame_id = 'base_link'
+        pose.header.stamp = self.get_clock().now().to_msg()
+        pose.pose.position = Point(x=x, y=y, z=z)
+        pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+        goal_msg = GoToPose.Goal()
+        goal_msg.target = pose
+        goal_msg.pos_tolerance_m = 0.01
+        goal_msg.ang_tolerance_rad = 6.28
+        goal_msg.timeout_sec = 15.0
+        goal_msg.allow_orientation = True
+        goal_msg.electromagnet_on = False
+        details = (
+            "manual  frame=base_link  x=%.3f  y=%.3f  z=%.3f  electromagnet=OFF  "
+            "pos_tol=0.010m  timeout=15.0s"
+        ) % (x, y, z)
+        self._set_robot_pose_status(details, "Moving to (%.3f, %.3f, %.3f)..." % (x, y, z))
+        self._log("Robot pose (manual): x=%.3f  y=%.3f  z=%.3f" % (x, y, z))
+        send_future = self._go_to_pose_client.send_goal_async(goal_msg)
+        send_future.add_done_callback(self._manual_move_response_callback)
+
+    def _on_manual_jog(self, axis, direction):
+        """Jog a single axis using +/- buttons (direction is +/-1)."""
+        axis = (axis or '').strip().lower()
+        direction = float(direction)
+        if axis not in ('x', 'y', 'z') or direction == 0.0:
+            return
+        try:
+            step_m = float(self._manual_jog_step_m_var.get().strip())
+        except (ValueError, AttributeError):
+            step_m = 0.005
+        if step_m == 0.0:
+            return
+
+        var = None
+        if axis == 'x':
+            var = self._manual_x_var
+        elif axis == 'y':
+            var = self._manual_y_var
+        else:
+            var = self._manual_z_var
+
+        try:
+            cur = float(var.get().strip())
+        except (ValueError, AttributeError):
+            return
+
+        new_val = cur + (direction * step_m)
+
+        # Keep display short but precise enough for meters.
+        s = f"{new_val:.6f}".rstrip('0').rstrip('.')
+        if s == '':
+            s = '0'
+        var.set(s)
+
+        # Send updated target immediately.
+        self._on_manual_move()
+
+    def _manual_move_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self._set_robot_pose_status("(goal was rejected by action server)", "Goal rejected")
+            return
+        self._set_robot_pose_status("(see above)", "Goal accepted, executing...")
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self._manual_move_result_callback)
+
+    def _manual_move_result_callback(self, future):
+        result = future.result().result
+        if result.success:
+            self._set_robot_pose_status("(last goal: manual pose)", "Done: moved to target.")
+        else:
+            msg = getattr(result, 'message', '') or 'Unknown error'
+            err_detail = "error_code=%s  final_pos_err=%.4fm  message=%s" % (
+                getattr(result, 'error_code', ''), getattr(result, 'final_pos_error_m', 0), msg)
+            self._set_robot_pose_status(err_detail, "Failed: " + msg)
+
+    def _calib_pickup_waypoint_name(self):
+        color = (self._calib_piece_color_var.get() or '').strip().lower()
+        slot = (self._calib_pickup_slot_var.get() or '').strip()
+        prefix = 'R' if color in ('red', 'r', 'x') else 'B'
+        return f"{prefix}{slot}"
+
+    def _calib_drop_waypoint_name(self):
+        cell = (self._calib_drop_cell_var.get() or '').strip()
+        return f"T{cell}"
+
+    def _get_manual_xyz_m(self):
+        x = float(self._manual_x_var.get().strip())
+        y = float(self._manual_y_var.get().strip())
+        z = float(self._manual_z_var.get().strip())
+        return x, y, z
+
+    def _calib_move_to_waypoint(self, waypoint_name):
+        """Move robot to a waypoint pose (magnet OFF) for calibration positioning."""
+        if self._robot_is_busy():
+            self._set_robot_pose_status("Robot busy (finish current move first)", "Blocked: robot busy")
+            return
+        pose = self._waypoint_pose(waypoint_name)
+        if not pose:
+            self.get_logger().warn("Calibration move: waypoint '%s' not found" % waypoint_name)
+            self._set_robot_pose_status("Waypoint not in config: %s" % waypoint_name, "Error")
+            return
+        if not self._go_to_pose_client.wait_for_server(timeout_sec=0.5):
+            self._set_robot_pose_status("go_to_pose action server not available", "Aborted")
+            return
+
+        self._calib_move_last_waypoint = waypoint_name
+        goal_msg = GoToPose.Goal()
+        goal_msg.target = pose
+        goal_msg.pos_tolerance_m = 0.01
+        goal_msg.ang_tolerance_rad = 6.28
+        goal_msg.timeout_sec = 15.0
+        goal_msg.allow_orientation = True
+        goal_msg.electromagnet_on = False
+
+        p = pose.pose.position
+        # Update manual XYZ boxes to target waypoint so user sees where we're moving
+        self._manual_x_var.set("%.3f" % p.x)
+        self._manual_y_var.set("%.3f" % p.y)
+        self._manual_z_var.set("%.3f" % p.z)
+        details = (
+            "calib move  waypoint=%s  frame=%s  x=%.3f  y=%.3f  z=%.3f  electromagnet=OFF"
+            % (waypoint_name, pose.header.frame_id, p.x, p.y, p.z)
+        )
+        self._set_robot_pose_status(details, "Moving for calibration...")
+        self._log(details)
+        send_future = self._go_to_pose_client.send_goal_async(goal_msg)
+        send_future.add_done_callback(self._calib_move_response_callback)
+
+    def _calib_move_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self._set_robot_pose_status("(goal was rejected by action server)", "Calibration move rejected")
+            return
+        self._set_robot_pose_status("(see above)", "Calibration goal accepted, executing...")
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self._calib_move_result_callback)
+
+    def _calib_move_result_callback(self, future):
+        result = future.result().result
+        if result.success:
+            wp = getattr(self, '_calib_move_last_waypoint', 'waypoint')
+            self._set_robot_pose_status("(last goal: %s)" % wp, "Done: calibration move.")
+            # Refresh manual coordinates from TF on main thread
+            self._schedule_manual_xyz_update_from_tf()
+        else:
+            msg = getattr(result, 'message', '') or 'Unknown error'
+            err_detail = "error_code=%s  final_pos_err=%.4fm  message=%s" % (
+                getattr(result, 'error_code', ''), getattr(result, 'final_pos_error_m', 0), msg)
+            self._set_robot_pose_status(err_detail, "Failed: calibration move")
+
+    def _save_calibrated_waypoint(self, waypoint_name):
+        """Save XYZ (from Manual move fields) into waypoint_name, then persist to YAML + reload."""
+        try:
+            x_m, y_m, z_m = self._get_manual_xyz_m()
+        except Exception:
+            self._set_robot_pose_status("Invalid XYZ (enter numeric values in meters).", "Error")
+            return
+
+        try:
+            self._update_waypoint_xyz(waypoint_name, x_m, y_m, z_m)
+            self._persist_waypoints()
+        except Exception as e:
+            self.get_logger().warn("Calibration save failed: %s" % e)
+            messagebox.showerror("Save failed", "Could not save waypoint to waypoints.yaml:\n%s" % e)
+            return
+
+        self._load_waypoints()
+        self.get_logger().info("Saved waypoint '%s' to waypoints.yaml." % waypoint_name)
+        if getattr(self, '_log_text', None) is not None:
+            self._log("Saved waypoint: %s  {x=%.3f, y=%.3f, z=%.3f}" % (waypoint_name, x_m, y_m, z_m))
+            self._log_waypoints()
+        self._set_robot_pose_status("Saved %s to waypoints.yaml" % waypoint_name, "Done")
+
+    def _save_calibrated_waypoint_from_current_pose(self, waypoint_name):
+        """Save XYZ from the robot's current TF pose into waypoint_name, then persist to YAML + reload."""
+        pose = self._get_current_pose_from_tf(warn_on_fail=True)
+        if not pose:
+            self._set_robot_pose_status("Could not read current pose from TF", "Error")
+            return
+        x_m = pose.pose.position.x
+        y_m = pose.pose.position.y
+        z_m = pose.pose.position.z
+
+        try:
+            self._update_waypoint_xyz(waypoint_name, x_m, y_m, z_m)
+            self._persist_waypoints()
+        except Exception as e:
+            self.get_logger().warn("Calibration save from current pose failed: %s" % e)
+            messagebox.showerror("Save failed", "Could not save waypoint to waypoints.yaml:\n%s" % e)
+            return
+
+        self._load_waypoints()
+        self.get_logger().info("Saved waypoint '%s' from current pose." % waypoint_name)
+        if getattr(self, '_log_text', None) is not None:
+            self._log("Saved waypoint from current pose: %s  {x=%.3f, y=%.3f, z=%.3f}" % (waypoint_name, x_m, y_m, z_m))
+            self._log_waypoints()
+        self._set_robot_pose_status("Saved %s from current pose to waypoints.yaml" % waypoint_name, "Done")
+
+    def _schedule_manual_xyz_realtime_update(self):
+        """Schedule periodic TF->manual XYZ sync."""
+        if not self._root or not self._root.winfo_exists():
+            return
+        if self._manual_xyz_realtime_enabled:
+            self._manual_xyz_after_id = self._root.after(200, self._update_manual_xyz_realtime)
+
+    def _schedule_manual_xyz_update_from_tf(self):
+        """Schedule a single force-update of manual XYZ from TF on the main thread.
+        Safe to call from ROS action callbacks (which run on executor thread).
+        """
+        if self._root and self._root.winfo_exists():
+            self._root.after(0, lambda: self._update_manual_xyz_realtime(force=True))
+
+    def _update_manual_xyz_realtime(self, force=False):
+        """Update manual move X/Y/Z boxes from the current end-effector TF pose."""
+        if not self._root or not self._root.winfo_exists():
+            return
+        if not getattr(self, '_manual_xyz_realtime_enabled', False):
+            return
+
+        focus = None
+        try:
+            focus = self._root.focus_get()
+        except (tk.TclError, KeyError):
+            focus = None
+
+        # Don't overwrite values while the user is actively typing in an entry,
+        # unless we explicitly force an update (e.g., after Reset).
+        if not force and focus in (
+            getattr(self, '_manual_x_entry', None),
+            getattr(self, '_manual_y_entry', None),
+            getattr(self, '_manual_z_entry', None),
+        ):
+            self._schedule_manual_xyz_realtime_update()
+            return
+
+        pose = self._get_current_pose_from_tf(warn_on_fail=False)
+        if pose:
+            x_m = pose.pose.position.x
+            y_m = pose.pose.position.y
+            z_m = pose.pose.position.z
+            self._manual_x_var.set(f"{x_m:.3f}")
+            self._manual_y_var.set(f"{y_m:.3f}")
+            self._manual_z_var.set(f"{z_m:.3f}")
+
+        self._schedule_manual_xyz_realtime_update()
+
+    def _on_calib_move_pickup(self):
+        self._calib_move_to_waypoint(self._calib_pickup_waypoint_name())
+
+    def _on_calib_move_drop(self):
+        self._calib_move_to_waypoint(self._calib_drop_waypoint_name())
+
+    def _on_calib_save_pickup(self):
+        self._save_calibrated_waypoint(self._calib_pickup_waypoint_name())
+
+    def _on_calib_save_drop(self):
+        self._save_calibrated_waypoint(self._calib_drop_waypoint_name())
+
+    def _on_calib_save_pickup_from_current(self):
+        self._save_calibrated_waypoint_from_current_pose(self._calib_pickup_waypoint_name())
+
+    def _on_calib_save_drop_from_current(self):
+        self._save_calibrated_waypoint_from_current_pose(self._calib_drop_waypoint_name())
+
+    def _on_calib_test_pick_place(self):
+        """One-time physical test: pick selected piece and place on selected board cell."""
+        if self._robot_is_busy():
+            self._set_robot_pose_status("Robot busy (finish current move first)", "Blocked: robot busy")
+            return
+        pick_wp = self._calib_pickup_waypoint_name()
+        drop_wp = self._calib_drop_waypoint_name()
+        if not self._waypoint_pose(pick_wp) or not self._waypoint_pose(drop_wp):
+            self._set_robot_pose_status("Waypoint(s) not in config.", "Error")
+            return
+
+        self._robot_move_pick = pick_wp
+        self._robot_move_place = drop_wp
+        self._robot_move_step = 0
+        self._robot_sequence_busy = True
+        self._log("Calibration test: place %s -> %s" % (pick_wp, drop_wp))
+        self._set_robot_pose_status("Calibration test: pick->place (%s -> %s)" % (pick_wp, drop_wp), "Starting...")
+        self._robot_place_piece_step()
 
     def _build_gui(self):
         self._root = tk.Tk()
         self._root.title("Macropad Tic-Tac-Toe")
-        self._root.geometry("520x380")
+        self._root.geometry("520x430")
         self._root.resizable(True, True)
 
         main = ttk.Frame(self._root, padding=10)
@@ -330,7 +1266,7 @@ class MacropadTictactoeNode(Node):
             self._port_combo["values"] = [p[0] for p in ports]
             self._port_combo.set(ports[0][0])
         else:
-            self._port_combo.set("/dev/ttyACM0" if __import__("sys").platform != "win32" else "COM1")
+            self._port_combo.set("/dev/ttyACM1" if __import__("sys").platform != "win32" else "COM1")
         ttk.Label(conn, text="Baud:").pack(side=tk.LEFT, padx=(12, 4))
         baud_var = tk.StringVar(value="115200")
         ttk.Combobox(conn, textvariable=baud_var, width=8, state="readonly",
@@ -357,6 +1293,160 @@ class MacropadTictactoeNode(Node):
         self._mode_combo.current(0)
         self._reset_btn = ttk.Button(ctrl, text="Reset game", command=self._on_reset)
         self._reset_btn.pack(side=tk.LEFT, padx=4)
+        self._reload_waypoints_btn = ttk.Button(ctrl, text="Reload waypoints", command=self._on_reload_waypoints)
+        self._reload_waypoints_btn.pack(side=tk.LEFT, padx=4)
+
+        # Waypoints YAML path override + browse dialog
+        ttk.Label(ctrl, text="Waypoints YAML:").pack(side=tk.LEFT, padx=(12, 4))
+        self._waypoints_yaml_path_var = tk.StringVar(value=self._default_waypoints_yaml_path())
+        ttk.Entry(ctrl, textvariable=self._waypoints_yaml_path_var, width=42).pack(side=tk.LEFT, padx=(0, 6))
+        ttk.Button(ctrl, text="Browse...", command=self._on_browse_waypoints_yaml).pack(side=tk.LEFT, padx=(0, 4))
+
+        # Piece locations (red = X, blue = O; R00–R04/B00–B04 = home, T00–T08 = board)
+        piece_frame = ttk.LabelFrame(main, text="Piece locations", padding=6)
+        piece_frame.pack(fill=tk.X, pady=(0, 6))
+        self._red_piece_locations_var = tk.StringVar()
+        self._blue_piece_locations_var = tk.StringVar()
+        ttk.Label(piece_frame, text="Red (X):", font=("TkDefaultFont", 9)).pack(anchor=tk.W)
+        ttk.Label(piece_frame, textvariable=self._red_piece_locations_var, font=("Consolas", 9)).pack(anchor=tk.W)
+        ttk.Label(piece_frame, text="Blue (O):", font=("TkDefaultFont", 9)).pack(anchor=tk.W)
+        ttk.Label(piece_frame, textvariable=self._blue_piece_locations_var, font=("Consolas", 9)).pack(anchor=tk.W)
+        self._update_piece_locations_display()
+
+        # Piece heights (mm): pickup lift after grab, approach height above board, drop height above board
+        height_frame = ttk.LabelFrame(main, text="Piece heights (mm)", padding=6)
+        height_frame.pack(fill=tk.X, pady=(0, 6))
+        height_row = ttk.Frame(height_frame)
+        height_row.pack(fill=tk.X)
+        ttk.Label(height_row, text="Pickup height (z, mm):").pack(side=tk.LEFT, padx=(0, 2))
+        self._pickup_lift_mm_var = tk.StringVar(value="75")
+        ttk.Entry(height_row, textvariable=self._pickup_lift_mm_var, width=6).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Label(height_row, text="Transit (approach):").pack(side=tk.LEFT, padx=(0, 2))
+        self._transit_height_mm_var = tk.StringVar(value="10")
+        ttk.Entry(height_row, textvariable=self._transit_height_mm_var, width=6).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Label(height_row, text="Drop height:").pack(side=tk.LEFT, padx=(0, 2))
+        self._drop_height_mm_var = tk.StringVar(value="5")
+        ttk.Entry(height_row, textvariable=self._drop_height_mm_var, width=6).pack(side=tk.LEFT, padx=(0, 8))
+
+        # Manual move: enter x, y, z and press Move robot
+        manual_frame = ttk.LabelFrame(main, text="Manual move", padding=6)
+        manual_frame.pack(fill=tk.X, pady=(0, 6))
+        manual_row = ttk.Frame(manual_frame)
+        manual_row.pack(fill=tk.X)
+        ttk.Label(manual_row, text="X:").pack(side=tk.LEFT, padx=(0, 2))
+        self._manual_x_var = tk.StringVar(value="0.20")
+        self._manual_x_entry = ttk.Entry(manual_row, textvariable=self._manual_x_var, width=8)
+        self._manual_x_entry.pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Label(manual_row, text="Y:").pack(side=tk.LEFT, padx=(0, 2))
+        self._manual_y_var = tk.StringVar(value="0.00")
+        self._manual_y_entry = ttk.Entry(manual_row, textvariable=self._manual_y_var, width=8)
+        self._manual_y_entry.pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Label(manual_row, text="Z:").pack(side=tk.LEFT, padx=(0, 2))
+        self._manual_z_var = tk.StringVar(value="0.15")
+        self._manual_z_entry = ttk.Entry(manual_row, textvariable=self._manual_z_var, width=8)
+        self._manual_z_entry.pack(side=tk.LEFT, padx=(0, 8))
+        self._manual_move_btn = ttk.Button(manual_row, text="Move robot", command=self._on_manual_move)
+        self._manual_move_btn.pack(side=tk.LEFT, padx=(12, 0))
+        ttk.Button(manual_row, text="Home", command=self._robot_go_home).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(manual_row, text="MID", command=self._robot_go_mid).pack(side=tk.LEFT, padx=(4, 0))
+        self._magnet_toggle_btn = ttk.Button(
+            manual_row, text="Magnet OFF", command=self._on_manual_toggle_magnet
+        )
+        self._magnet_toggle_btn.pack(side=tk.LEFT, padx=(8, 0))
+
+        # +/- jog buttons for each axis
+        jog_row = ttk.Frame(manual_frame)
+        jog_row.pack(fill=tk.X, pady=(6, 0))
+        ttk.Label(jog_row, text="Jog step (m):").pack(side=tk.LEFT, padx=(0, 4))
+        self._manual_jog_step_m_var = tk.StringVar(value="0.005")
+        ttk.Entry(jog_row, textvariable=self._manual_jog_step_m_var, width=8).pack(side=tk.LEFT, padx=(0, 12))
+
+        jog_btns = ttk.Frame(jog_row)
+        jog_btns.pack(side=tk.LEFT)
+        # X
+        ttk.Button(jog_btns, text="X-", width=4, command=lambda: self._on_manual_jog('x', -1)).grid(row=0, column=0, padx=(0, 6))
+        ttk.Button(jog_btns, text="X+", width=4, command=lambda: self._on_manual_jog('x', +1)).grid(row=0, column=1, padx=(0, 12))
+        # Y
+        ttk.Button(jog_btns, text="Y-", width=4, command=lambda: self._on_manual_jog('y', -1)).grid(row=0, column=2, padx=(0, 6))
+        ttk.Button(jog_btns, text="Y+", width=4, command=lambda: self._on_manual_jog('y', +1)).grid(row=0, column=3, padx=(0, 12))
+        # Z
+        ttk.Button(jog_btns, text="Z-", width=4, command=lambda: self._on_manual_jog('z', -1)).grid(row=0, column=4, padx=(0, 6))
+        ttk.Button(jog_btns, text="Z+", width=4, command=lambda: self._on_manual_jog('z', +1)).grid(row=0, column=5)
+
+        # Waypoint calibration: save pickup and drop xyz coordinates into waypoints.yaml
+        calib_frame = ttk.LabelFrame(main, text="Waypoint calibration (save to waypoints.yaml)", padding=6)
+        calib_frame.pack(fill=tk.X, pady=(0, 6))
+
+        calib_sel_row = ttk.Frame(calib_frame)
+        calib_sel_row.pack(fill=tk.X)
+        ttk.Label(calib_sel_row, text="Pickup piece:").pack(side=tk.LEFT, padx=(0, 6))
+        self._calib_piece_color_var = tk.StringVar(value="red")
+        ttk.Radiobutton(calib_sel_row, text="Red (X)", value="red", variable=self._calib_piece_color_var).pack(side=tk.LEFT)
+        ttk.Radiobutton(calib_sel_row, text="Blue (O)", value="blue", variable=self._calib_piece_color_var).pack(side=tk.LEFT, padx=(12, 0))
+        ttk.Label(calib_sel_row, text="Slot:").pack(side=tk.LEFT, padx=(12, 2))
+        self._calib_pickup_slot_var = tk.StringVar(value="00")
+        ttk.Combobox(
+            calib_sel_row,
+            textvariable=self._calib_pickup_slot_var,
+            values=["00", "01", "02", "03", "04"],
+            state="readonly",
+            width=4,
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(calib_sel_row, text="Drop cell:").pack(side=tk.LEFT, padx=(0, 2))
+        self._calib_drop_cell_var = tk.StringVar(value="00")
+        ttk.Combobox(
+            calib_sel_row,
+            textvariable=self._calib_drop_cell_var,
+            values=["00", "01", "02", "03", "04", "05", "06", "07", "08"],
+            state="readonly",
+            width=4,
+        ).pack(side=tk.LEFT)
+
+        ttk.Label(calib_frame, text="Use Manual move to jog, then save from current pose.", font=("TkDefaultFont", 9)).pack(
+            anchor=tk.W, pady=(6, 0)
+        )
+
+        calib_move_row = ttk.Frame(calib_frame)
+        calib_move_row.pack(fill=tk.X, pady=(6, 0))
+        ttk.Button(calib_move_row, text="Move to pickup wp", command=self._on_calib_move_pickup).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(calib_move_row, text="Move to drop wp", command=self._on_calib_move_drop).pack(side=tk.LEFT, padx=(0, 8))
+
+        calib_save_row = ttk.Frame(calib_frame)
+        calib_save_row.pack(fill=tk.X, pady=(6, 0))
+        ttk.Button(calib_save_row, text="Save pickup from XYZ", command=self._on_calib_save_pickup).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(calib_save_row, text="Save drop from XYZ", command=self._on_calib_save_drop).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(
+            calib_save_row,
+            text="Save pickup from current",
+            command=self._on_calib_save_pickup_from_current,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(
+            calib_save_row,
+            text="Save drop from current",
+            command=self._on_calib_save_drop_from_current,
+        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        calib_test_row = ttk.Frame(calib_frame)
+        calib_test_row.pack(fill=tk.X, pady=(6, 0))
+        ttk.Button(
+            calib_test_row,
+            text="Test pick & place (no game)",
+            command=self._on_calib_test_pick_place,
+        ).pack(side=tk.LEFT)
+
+        # Robot pose / move status (GoToPose goals sent and their status)
+        robot_frame = ttk.LabelFrame(main, text="Robot move status", padding=6)
+        robot_frame.pack(fill=tk.X, pady=(0, 6))
+        self._robot_pose_details_var = tk.StringVar(value="—")
+        self._robot_status_var = tk.StringVar(value="Idle")
+        ttk.Label(robot_frame, text="Pose / goal:", font=("TkDefaultFont", 9)).pack(anchor=tk.W)
+        self._robot_pose_details_label = ttk.Label(
+            robot_frame, textvariable=self._robot_pose_details_var,
+            font=("Consolas", 9), wraplength=480
+        )
+        self._robot_pose_details_label.pack(anchor=tk.W)
+        ttk.Label(robot_frame, text="Status:", font=("TkDefaultFont", 9)).pack(anchor=tk.W)
+        ttk.Label(robot_frame, textvariable=self._robot_status_var, font=("Consolas", 9)).pack(anchor=tk.W)
 
         # Log
         ttk.Label(main, text="Log:").pack(anchor=tk.W)
@@ -365,6 +1455,11 @@ class MacropadTictactoeNode(Node):
 
         self._root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._log_waypoints()
+
+        # Realtime sync: keep manual X/Y/Z entries showing current TF pose.
+        self._manual_xyz_realtime_enabled = True
+        self._manual_xyz_after_id = None
+        self._schedule_manual_xyz_realtime_update()
 
     def _log(self, msg):
         self._log_text.config(state=tk.NORMAL)
@@ -409,6 +1504,23 @@ class MacropadTictactoeNode(Node):
             return
         mode = self.GAME_MODES[self._game_mode_idx]
         self._status_var.set(f"{mode} — Turn: {self._turn} (Red=X, Blue=O)")
+
+    def _update_piece_locations_display(self):
+        """Refresh the piece locations shown in the window."""
+        if getattr(self, '_red_piece_locations_var', None) is None:
+            return
+        self._red_piece_locations_var.set("  ".join(self._red_piece_locations))
+        self._blue_piece_locations_var.set("  ".join(self._blue_piece_locations))
+
+    def _set_robot_pose_status(self, details_text, status_text):
+        """Update robot pose details and status in the GUI (safe to call from any thread)."""
+        if getattr(self, '_robot_pose_details_var', None) is None:
+            return
+        def update():
+            self._robot_pose_details_var.set(details_text)
+            self._robot_status_var.set(status_text)
+        if self._root and self._root.winfo_exists():
+            self._root.after(0, update)
 
     def _toggle_connect(self):
         if self._ser is not None and self._ser.is_open:
@@ -518,6 +1630,9 @@ class MacropadTictactoeNode(Node):
         """Process kp03..kp11 from macropad as cell selection."""
         if self._game_over or self._ser is None or not self._ser.is_open:
             return
+        # Do not accept any new moves while the robot is still executing pose commands.
+        if self._robot_is_busy():
+            return
         for token in text.split():
             token = token.strip()
             cell = KEY_TO_CELL.get(token)
@@ -525,11 +1640,18 @@ class MacropadTictactoeNode(Node):
                 continue
             mode = self._game_mode_idx
             if mode == 1:  # 2 Player: any turn from macropad
-                self._place(cell, self._turn)
+                moved_side = self._turn
+                self._place(cell, moved_side)
                 self._check_game_over()
                 if not self._game_over:
-                    self._turn = 'O' if self._turn == 'X' else 'X'
-                    self._send_command("rtrn" if self._turn == 'X' else "btrn")
+                    next_turn = 'O' if moved_side == 'X' else 'X'
+                    # If the robot started moving, delay enabling the next player's turn.
+                    if self._robot_move_pick is not None:
+                        self._pending_turn_value = next_turn
+                        self._pending_turn_command = "rtrn" if next_turn == 'X' else "btrn"
+                    else:
+                        self._turn = next_turn
+                        self._send_command("rtrn" if self._turn == 'X' else "btrn")
                 self._update_status()
                 return
             if mode == 0:  # 1 Player: only human (X) from macropad
@@ -548,6 +1670,10 @@ class MacropadTictactoeNode(Node):
     def _place(self, cell, side):
         """Place side ('X' or 'O') in cell and update macropad. Update piece location (home -> board T00-T08).
         Robot: move piece from corresponding red/blue home waypoint to board cell T00-T08."""
+        # Prevent concurrent placements while the robot is still moving the previous piece.
+        if self._robot_is_busy():
+            self._log("Robot busy (move in progress), ignoring place for cell %d" % cell)
+            return
         board_waypoint = "T%02d" % cell  # cell 0-8 -> T00-T08
         pick_waypoint = None
         if side == 'X':
@@ -565,11 +1691,20 @@ class MacropadTictactoeNode(Node):
         self._board[cell] = side
         cmd = ("sr" if side == 'X' else "sb") + f"{cell:02d}"
         self._send_command(cmd)
-        # Robot: pick from red/blue home, place on board (pick -> grab -> place -> release)
-        if pick_waypoint and board_waypoint in self._waypoints and pick_waypoint in self._waypoints:
+        self._update_piece_locations_display()
+        # Robot: pick from red/blue home, place on board (pick -> grab -> place -> release).
+        # Wait for current move to finish before starting another (each step waits for result before next).
+        if (pick_waypoint and board_waypoint in self._waypoints and pick_waypoint in self._waypoints
+                and 'MID' in self._waypoints):
+            if self._robot_move_pick is not None:
+                self._log("Robot busy (move in progress), skipping place for cell %d" % cell)
+                return
             self._robot_move_pick = pick_waypoint
             self._robot_move_place = board_waypoint
             self._robot_move_step = 0
+            self._robot_sequence_busy = True
+            self._log("Robot: place %s -> %s (piece from %s to cell %d)" % (
+                pick_waypoint, board_waypoint, pick_waypoint, cell))
             self._robot_place_piece_step()
 
     def _check_game_over(self):
@@ -588,6 +1723,11 @@ class MacropadTictactoeNode(Node):
         self._pending_computer_move_id = None
         if self._game_over or self._ser is None or not self._ser.is_open:
             return
+        # Wait for robot to finish before placing another piece.
+        if self._robot_is_busy():
+            if self._root:
+                self._pending_computer_move_id = self._root.after(200, self._do_computer_move)
+            return
         empty = empty_cells(self._board)
         if not empty:
             return
@@ -604,6 +1744,27 @@ class MacropadTictactoeNode(Node):
         if self._game_mode_idx == 2 and not self._game_over and self._root:
             self._pending_computer_move_id = self._root.after(600, self._do_computer_move)
 
+    def _do_logical_reset(self):
+        """Clear game state, piece locations, send clrb/rtrn, robot go home. Used after return queue done or when no pieces to return."""
+        self._board = [None] * 9
+        self._turn = 'X'
+        self._game_over = False
+        self._winner = None
+        self._game_mode_idx = self._mode_combo.current()
+        self._red_piece_locations = ["R00", "R01", "R02", "R03", "R04"]
+        self._blue_piece_locations = ["B00", "B01", "B02", "B03", "B04"]
+        self._update_piece_locations_display()
+        if self._ser is not None and self._ser.is_open:
+            self._send_command("clrb")
+            self._send_command("rtrn")
+        self._robot_go_home()
+        self._update_status()
+        self._manual_xyz_realtime_enabled = True
+        self._update_manual_xyz_realtime(force=True)
+        self._log("Game reset. Mode: " + self.GAME_MODES[self._game_mode_idx])
+        if self._game_mode_idx == 2 and self._root:
+            self._pending_computer_move_id = self._root.after(500, self._do_computer_move)
+
     def _on_reset(self):
         if self._pending_computer_move_id and self._root:
             try:
@@ -611,29 +1772,56 @@ class MacropadTictactoeNode(Node):
             except tk.TclError:
                 pass
             self._pending_computer_move_id = None
-        # Cancel any in-progress robot place sequence
+        self._pending_turn_value = None
+        self._pending_turn_command = None
+        # Build queue of (from_waypoint, to_waypoint) for pieces currently on the board
+        return_queue = []
+        for i in range(5):
+            loc = self._red_piece_locations[i]
+            if loc.startswith("T"):
+                return_queue.append((loc, "R%02d" % i))
+        for i in range(5):
+            loc = self._blue_piece_locations[i]
+            if loc.startswith("T"):
+                return_queue.append((loc, "B%02d" % i))
+        if not return_queue:
+            # No pieces on board: just logical reset and go home
+            self._robot_move_pick = None
+            self._robot_move_place = None
+            self._robot_move_step = 0
+            self._robot_sequence_busy = False
+            self._pose_goal_in_flight = False
+            self._em_goal_in_flight = False
+            self._reset_return_queue = None
+            self._do_logical_reset()
+            return
+        # Cancel any in-progress robot move so we can start return sequence
         self._robot_move_pick = None
         self._robot_move_place = None
         self._robot_move_step = 0
-        self._board = [None] * 9
-        self._turn = 'X'
-        self._game_over = False
-        self._winner = None
-        self._game_mode_idx = self._mode_combo.current()
-        # Reset piece locations to home: red at R00-R04, blue at B00-B04
-        self._red_piece_locations = ["R00", "R01", "R02", "R03", "R04"]
-        self._blue_piece_locations = ["B00", "B01", "B02", "B03", "B04"]
-        if self._ser is not None and self._ser.is_open:
-            self._send_command("clrb")
-            self._send_command("rtrn")
-        # Robot: move arm back to HOME waypoint
-        self._robot_go_home()
-        self._update_status()
-        self._log("Game reset. Mode: " + self.GAME_MODES[self._game_mode_idx])
-        if self._game_mode_idx == 2 and self._root:
-            self._pending_computer_move_id = self._root.after(500, self._do_computer_move)
+        self._robot_sequence_busy = False
+        self._pose_goal_in_flight = False
+        self._em_goal_in_flight = False
+        self._reset_return_queue = return_queue
+        self._log("Reset: returning %d piece(s) to home slots." % len(return_queue))
+        # Start first return: pick from board, place at home
+        from_wp, to_wp = self._reset_return_queue.pop(0)
+        self._robot_move_pick = from_wp
+        self._robot_move_place = to_wp
+        self._robot_move_step = 0
+        self._robot_sequence_busy = True
+        self._log("Robot: reset - returning %s -> %s" % (from_wp, to_wp))
+        self._robot_place_piece_step()
 
     def _on_close(self):
+        # Stop realtime manual XYZ updates
+        self._manual_xyz_realtime_enabled = False
+        if getattr(self, '_manual_xyz_after_id', None) and self._root:
+            try:
+                self._root.after_cancel(self._manual_xyz_after_id)
+            except tk.TclError:
+                pass
+
         if self._pending_computer_move_id and self._root:
             try:
                 self._root.after_cancel(self._pending_computer_move_id)
