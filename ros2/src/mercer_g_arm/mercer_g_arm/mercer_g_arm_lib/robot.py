@@ -97,7 +97,13 @@ class Robot:
 
         self.__calibrated = True
         self.__status = "IDDLE"
-                    
+    
+    def disableAllMotors(self):
+        self.__grbl.disableAllMotors()
+    
+    def enableAllMotors(self):
+        self.__grbl.enableAllMotors()
+    
     # Private
     __grbl = None 
     zeroGrblPosition = (0.0, 0.0, 0.0)

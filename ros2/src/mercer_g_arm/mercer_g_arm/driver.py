@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_srvs.srv import Trigger
 
 import math, time
 from termcolor import colored
@@ -36,6 +37,17 @@ class Driver(Node):
         timer_period = 0.1  # seconds
         self.timer = self.create_timer(timer_period, self.joints_state_apply)
         self.js_pub = self.create_publisher(JointState, 'joint_states', 10)
+
+        self.srv_enable_motors = self.create_service(
+            Trigger,
+            'g_arm_driver/enable_motors',
+            self.enable_motors_callback,
+        )
+        self.srv_disable_motors = self.create_service(
+            Trigger,
+            'g_arm_driver/disable_motors',
+            self.disable_motors_callback,
+        )
 
 
     # Callback of /joint_states. This stores the joints positions in memory      
@@ -81,6 +93,31 @@ class Driver(Node):
             ]
             self.js_pub.publish(msg)
 
+    def enable_motors_callback(self, request, response):
+        try:
+            self.robot.enableAllMotors()
+        except Exception as ex:
+            self.get_logger().error(f'enable_motors failed: {ex}')
+            response.success = False
+            response.message = f'enable_motors failed: {ex}'
+            return response
+        self.get_logger().info('Stepper motors ENABLED (holding torque on, GRBL $1=255)')
+        response.success = True
+        response.message = 'Motors enabled (holding torque on)'
+        return response
+
+    def disable_motors_callback(self, request, response):
+        try:
+            self.robot.disableAllMotors()
+        except Exception as ex:
+            self.get_logger().error(f'disable_motors failed: {ex}')
+            response.success = False
+            response.message = f'disable_motors failed: {ex}'
+            return response
+        self.get_logger().info('Stepper motors DISABLED (holding torque off, GRBL $1=0)')
+        response.success = True
+        response.message = 'Motors disabled (holding torque off)'
+        return response
 
 
 def main(args=None):

@@ -18,32 +18,44 @@ class Grbl:
     __threadRunning = False
     __threadAlive = True
 
-    def __init__(self): 
-        self.__feedbackThread = th.Thread(target=self.__feedbackThreadFunc) 
-                
-    def __sendOrder(self, order):
+    def __init__(self):
+        self.__serial_lock = th.Lock()
+        self.__feedbackThread = th.Thread(target=self.__feedbackThreadFunc)
+
+    def __sendOrder_unlocked(self, order):
         self.__serialBus.write(bytes(order.encode()))
         self.__serialBus.write('\r'.encode())
-    
+
+    def __sendOrder(self, order):
+        if self.__serialBus is None:
+            return
+        with self.__serial_lock:
+            self.__sendOrder_unlocked(order)
+
     # Receives information from GRBL status report
     def __updateInformation(self):
-        # Ask for status report 
+        # Ask for status report (hold lock so service-thread writes cannot interleave)
         reportObtained = False
         startTs = time.time()
-        
-        self.__sendOrder('?')
-    
-        while not reportObtained:
-            
-            received = str(self.__serialBus.readline())
-            
-            if '<' in received and '>' in received:
-                reportObtained = True
+        received = ""
 
-            # If last to much time, abort
-            if time.time() - startTs > 0.15:
-                break
-            
+        if self.__serialBus is None:
+            return
+
+        with self.__serial_lock:
+            self.__sendOrder_unlocked('?')
+
+            while not reportObtained:
+
+                received = str(self.__serialBus.readline())
+
+                if '<' in received and '>' in received:
+                    reportObtained = True
+
+                # If last to much time, abort
+                if time.time() - startTs > 0.15:
+                    break
+
         if reportObtained:
             # Parse report message
             statusMsg = received[3:][:-6]
@@ -184,7 +196,13 @@ class Grbl:
     
     def disableSpindle(self):
         self.__sendOrder("M5")
-                 
+
+    def disableAllMotors(self):
+        self.__sendOrder("$1=0")
+    
+    def enableAllMotors(self):
+        self.__sendOrder("$1=255")
+    
     def asyncAxisMove(self, axis, value, feedrate, relative):
         
         if axis not in 'XYZ':

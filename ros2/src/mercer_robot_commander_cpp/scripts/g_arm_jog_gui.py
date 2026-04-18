@@ -7,6 +7,7 @@ and controlling the electromagnet.
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
+from std_srvs.srv import Trigger
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from control_msgs.action import FollowJointTrajectory
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -40,7 +41,24 @@ class GArmJogGUI(Node):
             FollowJointTrajectory,
             '/magnet_controller/follow_joint_trajectory'
         )
-        
+        self.enable_motors_client = self.create_client(
+            Trigger,
+            '/g_arm_driver/enable_motors',
+        )
+        self.disable_motors_client = self.create_client(
+            Trigger,
+            '/g_arm_driver/disable_motors',
+        )
+        # Older g_arm_driver builds used connect_motors / disconnect_motors
+        self._legacy_connect_motors_client = self.create_client(
+            Trigger,
+            '/g_arm_driver/connect_motors',
+        )
+        self._legacy_disconnect_motors_client = self.create_client(
+            Trigger,
+            '/g_arm_driver/disconnect_motors',
+        )
+
         # Jog parameters
         self.jog_step = 0.01  # meters per jog command
         self.current_goal_handle = None  # Track current action goal
@@ -52,6 +70,9 @@ class GArmJogGUI(Node):
         
         # Electromagnet state
         self.electromagnet_on = False
+
+        # Stepper holding torque: last confirmed state from driver services
+        self.motors_enabled = True
         
         # Flag to track if GUI is ready
         self.gui_ready = False
@@ -62,7 +83,7 @@ class GArmJogGUI(Node):
         """Create and run the GUI"""
         self.root = tk.Tk()
         self.root.title("G-Arm Jog Control")
-        self.root.geometry("500x800")
+        self.root.geometry("500x860")
         
         # Main frame
         main_frame = ttk.Frame(self.root, padding="10")
@@ -196,27 +217,43 @@ class GArmJogGUI(Node):
         home_btn.grid(row=19, column=0, columnspan=3, pady=5)
         
         # Separator
-        ttk.Separator(main_frame, orient=tk.HORIZONTAL).grid(row=20, column=0, columnspan=3, 
+        ttk.Separator(main_frame, orient=tk.HORIZONTAL).grid(row=20, column=0, columnspan=3,
+                                                             sticky=(tk.W, tk.E), pady=10)
+        
+        # Stepper motors (GRBL $1): enable / disable holding torque via driver services
+        ttk.Label(main_frame, text="Stepper motors", font=("Arial", 12, "bold")).grid(
+            row=21, column=0, columnspan=3, pady=5
+        )
+        self.motors_enabled_var = tk.BooleanVar(value=self.motors_enabled)
+        ttk.Checkbutton(
+            main_frame,
+            text="Motors enabled (holding torque)",
+            variable=self.motors_enabled_var,
+            command=self._toggle_motors,
+        ).grid(row=22, column=0, columnspan=3, pady=5)
+        
+        # Separator
+        ttk.Separator(main_frame, orient=tk.HORIZONTAL).grid(row=23, column=0, columnspan=3,
                                                              sticky=(tk.W, tk.E), pady=10)
         
         # Electromagnet control
         ttk.Label(main_frame, text="Electromagnet", font=("Arial", 12, "bold")).grid(
-            row=21, column=0, columnspan=3, pady=5
+            row=24, column=0, columnspan=3, pady=5
         )
         
         self.magnet_var = tk.BooleanVar(value=False)
         magnet_toggle = ttk.Checkbutton(main_frame, text="Electromagnet ON", 
                                        variable=self.magnet_var,
                                        command=self._toggle_electromagnet)
-        magnet_toggle.grid(row=22, column=0, columnspan=3, pady=5)
+        magnet_toggle.grid(row=25, column=0, columnspan=3, pady=5)
         
         # Separator
-        ttk.Separator(main_frame, orient=tk.HORIZONTAL).grid(row=23, column=0, columnspan=3, 
+        ttk.Separator(main_frame, orient=tk.HORIZONTAL).grid(row=26, column=0, columnspan=3, 
                                                              sticky=(tk.W, tk.E), pady=10)
         
         # Status label
         self.status_label = ttk.Label(main_frame, text="Ready", foreground="green")
-        self.status_label.grid(row=24, column=0, columnspan=3, pady=10)
+        self.status_label.grid(row=27, column=0, columnspan=3, pady=10)
         
         self.root.focus_set()
         
@@ -561,6 +598,107 @@ class GArmJogGUI(Node):
             self.z_var.set(f"{pose.pose.position.z:.3f}")
     
     
+    def _toggle_motors(self):
+        """Schedule toggle after Tk applies the new checkbox state (BooleanVar)."""
+        if hasattr(self, "root"):
+            self.root.after_idle(self._toggle_motors_impl)
+        else:
+            self._toggle_motors_impl()
+
+    def _resolve_motor_trigger_client(self, want_enable):
+        """Return a ready Trigger client: enable_motors/disable_motors, else legacy names."""
+        primary = (
+            self.enable_motors_client if want_enable else self.disable_motors_client
+        )
+        legacy = (
+            self._legacy_connect_motors_client
+            if want_enable
+            else self._legacy_disconnect_motors_client
+        )
+        name_new = (
+            '/g_arm_driver/enable_motors'
+            if want_enable
+            else '/g_arm_driver/disable_motors'
+        )
+        name_leg = (
+            '/g_arm_driver/connect_motors'
+            if want_enable
+            else '/g_arm_driver/disconnect_motors'
+        )
+        if primary.wait_for_service(timeout_sec=1.5):
+            return primary
+        if legacy.wait_for_service(timeout_sec=2.0):
+            self.get_logger().info(
+                f'Motor service {name_new} not found; using {name_leg}. '
+                'Rebuild and restart mercer_g_arm (g_arm_driver) to use the new names.'
+            )
+            return legacy
+        self.get_logger().debug(
+            f'Neither {name_new} nor {name_leg} is available.'
+        )
+        return None
+
+    def _toggle_motors_impl(self):
+        """Enable or disable steppers via g_arm_driver services (GRBL $1)."""
+        want_enabled = self.motors_enabled_var.get()
+        if want_enabled == self.motors_enabled:
+            return
+        label = "Enable motors" if want_enabled else "Disable motors"
+        client = self._resolve_motor_trigger_client(want_enabled)
+        if client is None:
+            self.motors_enabled_var.set(self.motors_enabled)
+            self._update_status(
+                f"Service unavailable: {label}. "
+                "Start g_arm_driver (real hardware, not use_mock_hardware), "
+                "and rebuild mercer_g_arm if services are still missing.",
+                "red",
+            )
+            self.get_logger().warning(
+                f"Motor toggle ({label}) on jog GUI: no motor service found "
+                f"({'/g_arm_driver/enable_motors' if want_enabled else '/g_arm_driver/disable_motors'} "
+                "or legacy connect_motors / disconnect_motors)."
+            )
+            return
+        future = client.call_async(Trigger.Request())
+        future.add_done_callback(
+            lambda f, want=want_enabled, lbl=label: self._motor_toggle_done(
+                f, want, lbl
+            )
+        )
+
+    def _motor_toggle_done(self, future, want_enabled, service_label):
+        """Service completion may run on an rclpy thread; touch Tk only on the GUI thread."""
+
+        def apply_result(fut=future, want=want_enabled, lbl=service_label):
+            try:
+                resp = fut.result()
+            except Exception as ex:
+                self.motors_enabled_var.set(self.motors_enabled)
+                self._update_status(f"{lbl} failed: {ex}", "red")
+                self.get_logger().warning(
+                    f"Motor toggle ({lbl}) on jog GUI: service call failed: {ex}"
+                )
+                return
+            if not resp.success:
+                self.motors_enabled_var.set(self.motors_enabled)
+                msg = resp.message or f"{lbl} rejected"
+                self._update_status(msg, "red")
+                self.get_logger().warning(
+                    f"Motor toggle ({lbl}) on jog GUI: driver reported failure: {msg}"
+                )
+                return
+            self.motors_enabled = want
+            if want:
+                self.get_logger().info("Motors have been enabled (jog GUI)")
+            else:
+                self.get_logger().info("Motors have been disabled (jog GUI)")
+            self._update_status(resp.message, "green")
+
+        if hasattr(self, "root"):
+            self.root.after(0, apply_result)
+        else:
+            apply_result()
+
     def _toggle_electromagnet(self):
         """Toggle electromagnet on/off"""
         target_state = self.magnet_var.get()
