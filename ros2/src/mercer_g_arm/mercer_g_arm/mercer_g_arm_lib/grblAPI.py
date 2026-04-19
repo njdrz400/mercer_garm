@@ -197,9 +197,26 @@ class Grbl:
     def disableSpindle(self):
         self.__sendOrder("M5")
 
+    def wait_for_idle(self, timeout=15.0, poll_interval=0.02):
+        """Block until status is Idle or timeout. GRBL only applies $1 idle delay when Idle."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            self.__updateInformation()
+            if self.getStatus().strip().lower().startswith("idle"):
+                return True
+            time.sleep(poll_interval)
+        return False
+
     def disableAllMotors(self):
+        planner_idle = self.wait_for_idle()
+        if not planner_idle:
+            print(
+                "[WARN] [Grbl] wait_for_idle timed out; sending $1=0 anyway "
+                "(planner may still be busy)"
+            )
         self.__sendOrder("$1=0")
-    
+        return planner_idle
+
     def enableAllMotors(self):
         self.__sendOrder("$1=255")
     

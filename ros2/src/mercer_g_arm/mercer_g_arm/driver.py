@@ -3,7 +3,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 
-import math, time
+import math, threading, time
 from termcolor import colored
 from mercer_g_arm.mercer_g_arm_lib import robot
 
@@ -31,6 +31,15 @@ class Driver(Node):
                 f"Do you have permissions? (Try: sudo chmod 666 {usb_port})"
             )
             exit(1)
+
+        # When False, do not stream G-code from joint_commands; otherwise every
+        # setAngles (G01) re-engages steppers and masks GRBL $1=0 idle disable.
+        self._motors_enabled = True
+        self._motor_cmd_lock = threading.Lock()
+        # Last angles actually sent to GRBL (deg); avoids flooding the planner with
+        # identical G01 lines at 10 Hz, which keeps status != Idle and blocks $1=0.
+        self._last_sent_cmd_deg = None
+        self._angle_resend_epsilon_deg = 0.05
             
         self.get_logger().info(colored("Robot is ready to move!", "green"))
         
@@ -78,9 +87,21 @@ class Driver(Node):
             else:
                 pwm = 0.0
                 self.get_logger().warn("jointPWM key is missing in joint state message, setting PWM to zero")
-            
-            self.robot.toolPWM(pwm)
-            self.robot.setAngles(j1, j2, j3)
+
+            with self._motor_cmd_lock:
+                if not self._motors_enabled:
+                    pass
+                else:
+                    self.robot.toolPWM(pwm)
+                    last = self._last_sent_cmd_deg
+                    moved = last is None or (
+                        abs(j1 - last[0]) > self._angle_resend_epsilon_deg
+                        or abs(j2 - last[1]) > self._angle_resend_epsilon_deg
+                        or abs(j3 - last[2]) > self._angle_resend_epsilon_deg
+                    )
+                    if moved:
+                        self.robot.setAngles(j1, j2, j3)
+                        self._last_sent_cmd_deg = (j1, j2, j3)
             
             msg = JointState()
             msg.header.stamp = self.get_clock().now().to_msg()
@@ -95,7 +116,10 @@ class Driver(Node):
 
     def enable_motors_callback(self, request, response):
         try:
-            self.robot.enableAllMotors()
+            with self._motor_cmd_lock:
+                self.robot.enableAllMotors()
+                self._motors_enabled = True
+                self._last_sent_cmd_deg = None
         except Exception as ex:
             self.get_logger().error(f'enable_motors failed: {ex}')
             response.success = False
@@ -108,8 +132,21 @@ class Driver(Node):
 
     def disable_motors_callback(self, request, response):
         try:
-            self.robot.disableAllMotors()
+            with self._motor_cmd_lock:
+                self._motors_enabled = False
+                self._last_sent_cmd_deg = None
+            # Wait for planner idle and send $1=0 without holding _motor_cmd_lock so
+            # joint_states publishing is not stalled for the whole wait.
+            planner_idle = self.robot.disableAllMotors()
+            if not planner_idle:
+                self.get_logger().warn(
+                    'GRBL did not reach Idle before $1=0 (timeout). '
+                    'Motors may stay engaged until the planner finishes or you power-cycle. '
+                    'If this repeats, confirm firmware reports status Idle and nothing else streams G-code.'
+                )
         except Exception as ex:
+            with self._motor_cmd_lock:
+                self._motors_enabled = True
             self.get_logger().error(f'disable_motors failed: {ex}')
             response.success = False
             response.message = f'disable_motors failed: {ex}'

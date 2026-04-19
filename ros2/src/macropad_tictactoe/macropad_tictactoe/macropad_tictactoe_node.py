@@ -135,6 +135,9 @@ class MacropadTictactoeNode(Node):
         "Computer vs Computer",
     ]
 
+    # Pick/place: pick hover → pickup z → magnet ON → pick hover → transit → drop hover → drop → magnet OFF → MID → magnet OFF
+    _ROBOT_PLACE_NUM_STEPS = 10
+
     def __init__(self):
         super().__init__('macropad_tictactoe_node')
         self._ser = None
@@ -169,7 +172,7 @@ class MacropadTictactoeNode(Node):
         self._tf_listener = TransformListener(self._tf_buffer, self)
         self._robot_move_pick = None   # waypoint name (R0x or B0x) while move in progress
         self._robot_move_place = None  # waypoint name (T0x)
-        self._robot_move_step = 0      # 0=go pick mag off, 1=grab, 2=go place, 3=release
+        self._robot_move_step = 0      # see _robot_place_piece_step (0.._ROBOT_PLACE_NUM_STEPS-1)
         # Extra guards (beyond step-by-step chaining):
         # - sequence_busy: a multi-step place sequence is active
         # - pose_goal_in_flight: a GoToPose goal is currently executing
@@ -326,20 +329,29 @@ class MacropadTictactoeNode(Node):
             return None
 
     def _get_piece_heights_m(self):
-        """Return (pickup_lift_m, transit_height_m, drop_height_m) from GUI vars; use defaults on invalid input."""
+        """Return (hover_m, pickup_m, transit_m, drop_m) as offsets added to waypoint z (meters)."""
         try:
-            pickup_mm = float(self._pickup_lift_mm_var.get().strip())
+            hover_mm = float(self._hover_height_mm_var.get().strip())
         except (ValueError, AttributeError):
-            pickup_mm = 10.0
+            hover_mm = 60.0
+        try:
+            pickup_mm = float(self._pickup_height_mm_var.get().strip())
+        except (ValueError, AttributeError):
+            pickup_mm = 0.0
         try:
             transit_mm = float(self._transit_height_mm_var.get().strip())
         except (ValueError, AttributeError):
-            transit_mm = 10.0
+            transit_mm = 60.0
         try:
             drop_mm = float(self._drop_height_mm_var.get().strip())
         except (ValueError, AttributeError):
-            drop_mm = 5.0
-        return (pickup_mm / 1000.0, transit_mm / 1000.0, drop_mm / 1000.0)
+            drop_mm = 20.0
+        return (
+            hover_mm / 1000.0,
+            pickup_mm / 1000.0,
+            transit_mm / 1000.0,
+            drop_mm / 1000.0,
+        )
 
     def _waypoint_pose(self, waypoint_name, frame_id='base_link'):
         """Build PoseStamped for a waypoint name (must be in self._waypoints)."""
@@ -387,8 +399,11 @@ class MacropadTictactoeNode(Node):
             self._em_goal_in_flight = False
             # Still advance sequence to avoid deadlock
             self._robot_move_step += 1
-            self._log("Robot magnet step %d/8 completed (skipped)." % self._robot_move_step)
-            if self._robot_move_step >= 8:
+            self._log(
+                "Robot magnet step %d/%d completed (skipped)."
+                % (self._robot_move_step, self._ROBOT_PLACE_NUM_STEPS)
+            )
+            if self._robot_move_step >= self._ROBOT_PLACE_NUM_STEPS:
                 from_wp = self._robot_move_pick
                 to_wp = self._robot_move_place
                 self._robot_move_pick = self._robot_move_place = None
@@ -441,7 +456,13 @@ class MacropadTictactoeNode(Node):
 
         self._log(
             "Robot magnet command (step %d/%d): %s via %s (jointPWM=%.1f)"
-            % (step_for_logging + 1, 8, "ON" if turn_on else "OFF", controller_name, target_pwm)
+            % (
+                step_for_logging + 1,
+                self._ROBOT_PLACE_NUM_STEPS,
+                "ON" if turn_on else "OFF",
+                controller_name,
+                target_pwm,
+            )
         )
         self._set_robot_pose_status(
             "(electromagnet %s)" % ("ON" if turn_on else "OFF"),
@@ -533,8 +554,11 @@ class MacropadTictactoeNode(Node):
             self._em_goal_in_flight = False
             # Advance sequence anyway
             self._robot_move_step += 1
-            self._log("Robot magnet step %d/8 completed (rejected)." % self._robot_move_step)
-            if self._robot_move_step >= 8:
+            self._log(
+                "Robot magnet step %d/%d completed (rejected)."
+                % (self._robot_move_step, self._ROBOT_PLACE_NUM_STEPS)
+            )
+            if self._robot_move_step >= self._ROBOT_PLACE_NUM_STEPS:
                 from_wp = self._robot_move_pick
                 to_wp = self._robot_move_place
                 self._robot_move_pick = self._robot_move_place = None
@@ -587,14 +611,20 @@ class MacropadTictactoeNode(Node):
         self._em_goal_in_flight = False
         if succeeded:
             self.get_logger().info("Robot magnet turned %s" % ("ON" if turn_on else "OFF"))
-            self._log("Robot magnet step %d/8 completed." % (step_for_logging + 1))
+            self._log(
+                "Robot magnet step %d/%d completed."
+                % (step_for_logging + 1, self._ROBOT_PLACE_NUM_STEPS)
+            )
         else:
             self.get_logger().warn("Robot magnet command failed (status=%s)" % status)
-            self._log("Robot magnet step %d/8 completed (failed)." % (step_for_logging + 1))
+            self._log(
+                "Robot magnet step %d/%d completed (failed)."
+                % (step_for_logging + 1, self._ROBOT_PLACE_NUM_STEPS)
+            )
 
         # Advance sequence
         self._robot_move_step += 1
-        if self._robot_move_step >= 8:
+        if self._robot_move_step >= self._ROBOT_PLACE_NUM_STEPS:
             from_wp = self._robot_move_pick
             to_wp = self._robot_move_place
             self._robot_move_pick = self._robot_move_place = None
@@ -647,73 +677,88 @@ class MacropadTictactoeNode(Node):
             self._robot_place_piece_step()
 
     def _robot_place_piece_step(self):
-        """Send one step of pick->grab->lift->approach->lower&release->magnet_off->return to MID->magnet_off at MID.
-        Steps 0–7 (no via-MID step).
+        """Pick/place sequence (10 steps). Heights are +Z offsets (m) on waypoint z from the GUI.
+
+        0–1: hover then lower to pickup (magnet off) · 2: magnet ON · 3: pick hover (magnet on) ·
+        4: transit over board · 5: hover over drop · 6: drop height (magnet off) · 7: magnet OFF ·
+        8: MID · 9: magnet OFF at MID.
         """
         if self._robot_move_pick is None or self._robot_move_place is None:
             return
         step = self._robot_move_step
-        # Magnet-only steps: send direct electromagnet command to guarantee OFF even if
-        # GoToPose server skips its internal OFF due to missing/incorrect jointPWM feedback.
-        if step in (5, 7):
+        N = self._ROBOT_PLACE_NUM_STEPS
+        # Magnet-only steps (guarantee ON/OFF independent of GoToPose server PWM handling)
+        if step == 2:
+            self._robot_send_em_command_async(True, step)
+            return
+        if step in (7, 9):
             self._robot_send_em_command_async(False, step)
             return
+
+        hover_m, pickup_m, transit_m, drop_m = self._get_piece_heights_m()
+
         if step == 0:
-            wp_name = self._robot_move_pick
+            wp_name = self._robot_move_pick + "_hover"
             magnet_on = False
-        elif step == 1:
-            wp_name = self._robot_move_pick
-            magnet_on = True
-        elif step == 2:
-            # Lift after grab — magnet stays ON while carrying piece
-            wp_name = self._robot_move_pick + "_LIFT"
-            magnet_on = True
-        elif step == 3:
-            # Approach board: stay 10mm above T0X waypoint, magnet on
-            wp_name = self._robot_move_place + "+10mm"
-            magnet_on = True
-        elif step == 4:
-            # Lower to 5mm above waypoint and turn off magnet
-            wp_name = self._robot_move_place + "+5mm"
-            magnet_on = False
-        elif step == 6:
-            # Move to MID (magnet off requested; server may only apply on success)
-            wp_name = 'MID'
-            magnet_on = False
-        elif step == 7:
-            # Explicit magnet-off at MID (handled by magnet-only step 7)
-            wp_name = 'MID_off'
-            magnet_on = False
-        else:
-            wp_name = self._robot_move_place
-            magnet_on = False
-        pickup_m, transit_m, drop_m = self._get_piece_heights_m()
-        if step in (0, 1):
-            # Pickup pose: use waypoint x,y,z (and orientation) directly from YAML
             pose = self._waypoint_pose(self._robot_move_pick)
             if pose:
-                # no z override
-                pass
-        elif step == 2:
-            # Lift pose: add pickup height (mm from GUI) on top of the waypoint z
+                pose.pose.position.z += hover_m
+        elif step == 1:
+            wp_name = self._robot_move_pick + "_pickup"
+            magnet_on = False
             pose = self._waypoint_pose(self._robot_move_pick)
             if pose:
                 pose.pose.position.z += pickup_m
         elif step == 3:
-            # Approach board: transit height above T0X waypoint
+            wp_name = self._robot_move_pick + "_hover_carry"
+            magnet_on = True
+            pose = self._waypoint_pose(self._robot_move_pick)
+            if pose:
+                pose.pose.position.z += hover_m
+        elif step == 4:
+            wp_name = self._robot_move_place + "_transit"
+            magnet_on = True
             pose = self._waypoint_pose(self._robot_move_place)
             if pose:
                 pose.pose.position.z += transit_m
-        elif step == 4:
-            # Lower & release at drop height above board
+        elif step == 5:
+            wp_name = self._robot_move_place + "_hover_drop"
+            magnet_on = True
+            pose = self._waypoint_pose(self._robot_move_place)
+            if pose:
+                pose.pose.position.z += hover_m
+        elif step == 6:
+            wp_name = self._robot_move_place + "_drop"
+            magnet_on = False
             pose = self._waypoint_pose(self._robot_move_place)
             if pose:
                 pose.pose.position.z += drop_m
-        elif step == 7:
-            # Same pose as MID (explicit magnet-off at MID)
+        elif step == 8:
+            wp_name = 'MID'
+            magnet_on = False
+            pose = self._waypoint_pose('MID')
+        elif step == 9:
+            wp_name = 'MID_off'
+            magnet_on = False
             pose = self._waypoint_pose('MID')
         else:
-            pose = self._waypoint_pose(wp_name)
+            wp_name = '?'
+            magnet_on = False
+            pose = None
+
+        step_labels = (
+            "pick hover over piece (magnet off)",
+            "lower to pickup height (magnet off)",
+            "magnet ON at pickup",
+            "lift to pick hover (magnet on)",
+            "transit to drop cell (magnet on)",
+            "hover over drop cell (magnet on)",
+            "lower to drop height / release (magnet off)",
+            "magnet OFF confirm",
+            "return to MID (magnet off)",
+            "magnet OFF at MID",
+        )
+
         if not pose:
             self.get_logger().warn("Robot move: waypoint '%s' not found" % wp_name)
             self._robot_move_pick = self._robot_move_place = None
@@ -749,28 +794,36 @@ class MacropadTictactoeNode(Node):
         goal_msg.timeout_sec = 15.0
         goal_msg.allow_orientation = True
         goal_msg.electromagnet_on = magnet_on
-        # Display pose details and status
-        step_labels = (
-            "pick (magnet off)",
-            "grab (magnet on)",
-            "lift pickup (magnet on)",
-            "approach board transit (magnet on)",
-            "lower to drop & release (magnet off)",
-            "magnet OFF (same pose)",
-            "return to MID (magnet off)",
-            "magnet OFF at MID (same pose)",
-        )
         p = pose.pose.position
         details = (
             "waypoint=%s  frame=%s  x=%.3f  y=%.3f  z=%.3f  electromagnet=%s  "
-            "pos_tol=%.3fm  timeout=%.1fs  [step %d/8: %s]"
-        ) % (wp_name, pose.header.frame_id, p.x, p.y, p.z, "ON" if magnet_on else "OFF",
-             0.01, 15.0, step + 1, step_labels[step])
-        self._set_robot_pose_status(details, "Moving... (step %d/8)" % (step + 1))
-        # Log waypoint to log box when sending pose command
+            "pos_tol=%.3fm  timeout=%.1fs  [step %d/%d: %s]"
+        ) % (
+            wp_name,
+            pose.header.frame_id,
+            p.x,
+            p.y,
+            p.z,
+            "ON" if magnet_on else "OFF",
+            0.01,
+            15.0,
+            step + 1,
+            N,
+            step_labels[step],
+        )
+        self._set_robot_pose_status(details, "Moving... (step %d/%d)" % (step + 1, N))
         self._log(
-            "Robot pose step %d/8: waypoint=%s  x=%.3f  y=%.3f  z=%.3f  magnet=%s  [%s]"
-            % (step + 1, wp_name, p.x, p.y, p.z, "ON" if magnet_on else "OFF", step_labels[step])
+            "Robot pose step %d/%d: waypoint=%s  x=%.3f  y=%.3f  z=%.3f  magnet=%s  [%s]"
+            % (
+                step + 1,
+                N,
+                wp_name,
+                p.x,
+                p.y,
+                p.z,
+                "ON" if magnet_on else "OFF",
+                step_labels[step],
+            )
         )
         send_future = self._go_to_pose_client.send_goal_async(goal_msg)
         send_future.add_done_callback(self._robot_place_goal_response_callback)
@@ -815,8 +868,11 @@ class MacropadTictactoeNode(Node):
                 self._set_robot_pose_status(err_detail, "Failed: " + msg)
             return
         self._robot_move_step += 1
-        self._log("Robot pose step %d/8 completed." % self._robot_move_step)
-        if self._robot_move_step >= 8:
+        self._log(
+            "Robot pose step %d/%d completed."
+            % (self._robot_move_step, self._ROBOT_PLACE_NUM_STEPS)
+        )
+        if self._robot_move_step >= self._ROBOT_PLACE_NUM_STEPS:
             self._robot_move_pick = self._robot_move_place = None
             self._robot_move_step = 0
             self._robot_sequence_busy = False
@@ -944,6 +1000,14 @@ class MacropadTictactoeNode(Node):
             err_detail = "error_code=%s  final_pos_err=%.4fm  message=%s" % (
                 getattr(result, 'error_code', ''), getattr(result, 'final_pos_error_m', 0), msg)
             self._set_robot_pose_status(err_detail, "Failed: " + msg)
+
+    def _try_robot_idle_mid(self):
+        """When not running a pick/place sequence, move to MID (waiting pose)."""
+        if self._robot_is_busy():
+            return
+        if 'MID' not in self._waypoints:
+            return
+        self._robot_go_mid()
 
     def _on_manual_move(self):
         """Move robot to user-entered x, y, z (frame base_link)."""
@@ -1214,6 +1278,10 @@ class MacropadTictactoeNode(Node):
     def _on_calib_move_drop(self):
         self._calib_move_to_waypoint(self._calib_drop_waypoint_name())
 
+    def _on_test_move_t04(self):
+        """Test: move arm to board waypoint T04 (magnet off)."""
+        self._calib_move_to_waypoint('T04')
+
     def _on_calib_save_pickup(self):
         self._save_calibrated_waypoint(self._calib_pickup_waypoint_name())
 
@@ -1313,19 +1381,22 @@ class MacropadTictactoeNode(Node):
         ttk.Label(piece_frame, textvariable=self._blue_piece_locations_var, font=("Consolas", 9)).pack(anchor=tk.W)
         self._update_piece_locations_display()
 
-        # Piece heights (mm): pickup lift after grab, approach height above board, drop height above board
-        height_frame = ttk.LabelFrame(main, text="Piece heights (mm)", padding=6)
+        # Piece heights (mm): added to waypoint z — hover over pick/drop, grab height, travel, place release
+        height_frame = ttk.LabelFrame(main, text="Piece heights (mm, +Z above waypoint z)", padding=6)
         height_frame.pack(fill=tk.X, pady=(0, 6))
         height_row = ttk.Frame(height_frame)
         height_row.pack(fill=tk.X)
-        ttk.Label(height_row, text="Pickup height (z, mm):").pack(side=tk.LEFT, padx=(0, 2))
-        self._pickup_lift_mm_var = tk.StringVar(value="75")
-        ttk.Entry(height_row, textvariable=self._pickup_lift_mm_var, width=6).pack(side=tk.LEFT, padx=(0, 12))
-        ttk.Label(height_row, text="Transit (approach):").pack(side=tk.LEFT, padx=(0, 2))
-        self._transit_height_mm_var = tk.StringVar(value="10")
-        ttk.Entry(height_row, textvariable=self._transit_height_mm_var, width=6).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Label(height_row, text="Hover height:").pack(side=tk.LEFT, padx=(0, 2))
+        self._hover_height_mm_var = tk.StringVar(value="60")
+        ttk.Entry(height_row, textvariable=self._hover_height_mm_var, width=6).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(height_row, text="Pickup (grab z):").pack(side=tk.LEFT, padx=(0, 2))
+        self._pickup_height_mm_var = tk.StringVar(value="0")
+        ttk.Entry(height_row, textvariable=self._pickup_height_mm_var, width=6).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(height_row, text="Transit height:").pack(side=tk.LEFT, padx=(0, 2))
+        self._transit_height_mm_var = tk.StringVar(value="60")
+        ttk.Entry(height_row, textvariable=self._transit_height_mm_var, width=6).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Label(height_row, text="Drop height:").pack(side=tk.LEFT, padx=(0, 2))
-        self._drop_height_mm_var = tk.StringVar(value="5")
+        self._drop_height_mm_var = tk.StringVar(value="20")
         ttk.Entry(height_row, textvariable=self._drop_height_mm_var, width=6).pack(side=tk.LEFT, padx=(0, 8))
 
         # Manual move: enter x, y, z and press Move robot
@@ -1349,6 +1420,7 @@ class MacropadTictactoeNode(Node):
         self._manual_move_btn.pack(side=tk.LEFT, padx=(12, 0))
         ttk.Button(manual_row, text="Home", command=self._robot_go_home).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(manual_row, text="MID", command=self._robot_go_mid).pack(side=tk.LEFT, padx=(4, 0))
+        ttk.Button(manual_row, text="Test T04", command=self._on_test_move_t04).pack(side=tk.LEFT, padx=(6, 0))
         self._magnet_toggle_btn = ttk.Button(
             manual_row, text="Magnet OFF", command=self._on_manual_toggle_magnet
         )
@@ -1551,6 +1623,7 @@ class MacropadTictactoeNode(Node):
             # Start the serial read loop (it only runs when connected; run() calls it once at startup when _ser is None)
             if self._root and self._root.winfo_exists():
                 self._poll_serial()
+                self._root.after(400, self._try_robot_idle_mid)
         except Exception as e:
             messagebox.showerror("Connection error", str(e))
 
@@ -1745,7 +1818,7 @@ class MacropadTictactoeNode(Node):
             self._pending_computer_move_id = self._root.after(600, self._do_computer_move)
 
     def _do_logical_reset(self):
-        """Clear game state, piece locations, send clrb/rtrn, robot go home. Used after return queue done or when no pieces to return."""
+        """Clear game state, piece locations, send clrb/rtrn; robot to MID (or HOME if no MID)."""
         self._board = [None] * 9
         self._turn = 'X'
         self._game_over = False
@@ -1757,7 +1830,10 @@ class MacropadTictactoeNode(Node):
         if self._ser is not None and self._ser.is_open:
             self._send_command("clrb")
             self._send_command("rtrn")
-        self._robot_go_home()
+        if 'MID' in self._waypoints:
+            self._robot_go_mid()
+        else:
+            self._robot_go_home()
         self._update_status()
         self._manual_xyz_realtime_enabled = True
         self._update_manual_xyz_realtime(force=True)

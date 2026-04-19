@@ -99,7 +99,7 @@ class Robot:
         self.__status = "IDDLE"
     
     def disableAllMotors(self):
-        self.__grbl.disableAllMotors()
+        return self.__grbl.disableAllMotors()
     
     def enableAllMotors(self):
         self.__grbl.enableAllMotors()
